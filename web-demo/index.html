@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timeline Seesaw — Web Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Timeline Seesaw — Web Demo</h1>
+      <div class="turn">턴 <span id="turn-count">1</span></div>
+    </header>
+
+    <section class="panel">
+      <div class="combatant-row">
+        <div class="combatant-name">보스</div>
+        <div class="hp-bar-track"><div id="boss-hp-fill" class="hp-bar-fill boss"></div></div>
+        <div class="hp-text" id="boss-hp-text">120 / 120</div>
+      </div>
+      <div class="badges" id="boss-badges"></div>
+      <div class="boss-skill-legend" id="boss-skill-legend"></div>
+    </section>
+
+    <section class="panel gauge-panel">
+      <div class="gauge-track" id="gauge-track">
+        <div class="gauge-cells" id="gauge-cells"></div>
+        <div class="gauge-marker" id="gauge-marker"></div>
+      </div>
+      <div class="intent-preview" id="intent-preview"></div>
+    </section>
+
+    <section class="panel">
+      <div class="combatant-row">
+        <div class="combatant-name">플레이어</div>
+        <div class="hp-bar-track"><div id="player-hp-fill" class="hp-bar-fill player"></div></div>
+        <div class="hp-text" id="player-hp-text">70 / 70</div>
+      </div>
+      <div class="badges" id="player-badges"></div>
+    </section>
+
+    <section class="play-zone" id="play-zone">카드를 이 영역으로 드래그하면 사용합니다 (클릭해도 사용됩니다)</section>
+
+    <div class="combo-row">
+      <span class="combo-label">콤보</span>
+      <div class="combo-dots" id="combo-dots"></div>
+      <span class="combo-hint">3장 연속 사용 시 카드 1장 추가 드로우</span>
+    </div>
+
+    <section class="panel">
+      <div class="hand-row" id="hand-row"></div>
+    </section>
+
+    <div class="controls-row">
+      <div class="pile-counts" id="pile-counts"></div>
+      <div style="display:flex; gap:8px;">
+        <button id="pass-btn" title="패스하면 게이지가 보스 쪽으로 3칸 밀리는 대신 카드 1장을 뽑습니다">턴 종료 (패스, 메모리 -3 / 드로우 +1)</button>
+        <button id="restart-btn">다시 시작</button>
+      </div>
+    </div>
+
+    <section class="panel log-panel" id="log-panel"></section>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <h2 id="overlay-title">승리!</h2>
+    <button class="primary" id="overlay-restart">다시 시작</button>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="engine.js"></script>
+  <script src="ui.js"></script>
+  <script>
+    TS_UI.init();
+  </script>
+</body>
+</html>
