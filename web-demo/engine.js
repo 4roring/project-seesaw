@@ -65,6 +65,7 @@ const TS_Engine = (() => {
       cardsPlayedThisTurn: 0,
       comboCounter: 0,
       comboBonusDrawsThisTurn: 0,
+      cardsDiscardedThisTurn: 0, // 패 파기 카드로 버린 장수 — 보충 드로우에 포함
 
       drawPile: buildDeck(config.deck),
       hand: [],
@@ -95,15 +96,18 @@ const TS_Engine = (() => {
   }
 
   function startPlayerTurn(game) {
-    // 직전 턴에 사용한 카드 수 - 콤보로 당겨 쓴 수만큼 보충 (핸드는 유지)
-    // gdd/07-turn-economy-revision.md 7-2
-    const refillCount = Math.max(0, game.cardsPlayedThisTurn - game.comboBonusDrawsThisTurn);
+    // 직전 턴에 "손에서 빠져나간" 카드 수(사용 + 파기) - 콤보로 당겨 쓴 수만큼
+    // 보충 (핸드는 유지). 파기를 세지 않으면 패 파기 카드가 손패를 영구히
+    // 줄이는 함정이 된다. gdd/07-turn-economy-revision.md 7-2
+    const refillCount = Math.max(0,
+      game.cardsPlayedThisTurn + game.cardsDiscardedThisTurn - game.comboBonusDrawsThisTurn);
     game.playerBlock = 0;
     // pendingCostReduction / pendingDamageMultiplier는 리셋하지 않는다 — 실제로
     // 카드에 소비될 때까지 턴을 넘겨도 유지 (gdd/06 6-6)
     game.cardsPlayedThisTurn = 0;
     game.comboCounter = 0;
     game.comboBonusDrawsThisTurn = 0;
+    game.cardsDiscardedThisTurn = 0;
     tickActiveEffects(game);
     drawCards(game, refillCount);
     pushLog(game, `--- 턴 ${game.turn} 시작 (게이지 ${gaugeLabel(game.gauge)}) ---`);
@@ -383,16 +387,32 @@ const TS_Engine = (() => {
     const effectiveCost = Math.max(0, card.cost - game.pendingCostReduction);
     game.pendingCostReduction = 0;
 
-    let effectiveDamage = card.damage;
+    game.hand.splice(idx, 1);
+    game.discardPile.push(card);
+
+    // 패 파기 (블루) — 남은 손패를 전부 버리고 버린 장수만큼 피해를 더한다.
+    // 파기한 장수는 다음 턴 보충 드로우에 포함되므로 손패가 줄지 않는다.
+    let discardBonus = 0;
+    if (card.discardAll) {
+      const discarded = game.hand.length;
+      if (discarded > 0) {
+        game.discardPile.push(...game.hand);
+        game.hand = [];
+        game.cardsDiscardedThisTurn += discarded;
+        discardBonus = card.discardAll * discarded;
+        pushLog(game, `손패 ${discarded}장을 파기 — 추가 피해 ${discardBonus}.`);
+      } else {
+        pushLog(game, '파기할 손패가 없습니다.');
+      }
+    }
+
+    let effectiveDamage = card.damage + discardBonus;
     if (effectiveDamage > 0) {
       effectiveDamage *= game.pendingDamageMultiplier;
       game.pendingDamageMultiplier = 1;
       effectiveDamage += sumEffectAmount(game, 'DAMAGE_BOOST');
       if (game.playerWeakenActive) effectiveDamage = Math.round(effectiveDamage * 0.75);
     }
-
-    game.hand.splice(idx, 1);
-    game.discardPile.push(card);
 
     if (card.hpCost) {
       game.playerHp -= card.hpCost;

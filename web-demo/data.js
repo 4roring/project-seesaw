@@ -43,7 +43,9 @@ const TS_DATA = {
       { key: 'rewind', name: '메모리 되감기', cost: 0, damage: 0, block: 0, count: 1, rewind: 1, desc: '비용 0 · 메모리 1 회복 (게이지 P쪽 1칸)' },
       { key: 'chain', name: '연쇄 반응', cost: 2, damage: 12, block: 0, count: 1, draw: 1, desc: '피해 12, 카드 1장 드로우' },
       { key: 'overload_info', name: '정보 과부하', cost: 1, damage: 5, block: 0, count: 2, draw: 1, desc: '피해 5, 카드 1장 드로우' },
-      { key: 'datacut', name: '데이터 절단', cost: 2, damage: 9, block: 0, count: 1, desc: '피해 9' },
+      // 패 파기 페이오프 — 블루는 드로우로 손패를 쌓으므로 그걸 화력으로 환전한다.
+      // 파기한 장수는 다음 턴 보충에 포함되어 손패가 영구히 줄지 않는다.
+      { key: 'memflush', name: '메모리 방출', cost: 2, damage: 4, block: 0, count: 1, discardAll: 5, desc: '피해 4 + 손패를 전부 파기하고 버린 1장당 피해 5' },
     ],
     BLACK: [
       { key: 'guard', name: '강건한 수비', cost: 1, damage: 0, block: 8, count: 3, desc: '방어도 8' },
@@ -84,6 +86,7 @@ const TS_DATA = {
         { key: 'hack', name: '시스템 해킹', cost: 2, damage: 13, block: 0, rewind: 1, desc: '피해 13, 게이지 1칸 되감기' },
         { key: 'cache_amp', name: '옵션: 캐시 증폭', cost: 2, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '캐시 증폭', amount: 2, turns: 3 }, desc: '3턴간 공격 카드 피해 +2' },
         { key: 'parallel', name: '병렬 처리', cost: 3, damage: 19, block: 0, draw: 1, desc: '피해 19, 카드 1장 드로우' },
+        { key: 'cache_burn', name: '캐시 소각', cost: 2, damage: 6, block: 0, discardAll: 7, desc: '피해 6 + 파기한 1장당 피해 7' },
       ],
       3: [
         { key: 'overflow', name: '오버플로우', cost: 4, damage: 31, block: 0, draw: 2, desc: '피해 31, 카드 2장 드로우' },
@@ -91,6 +94,7 @@ const TS_DATA = {
         { key: 'codebreak', name: '코드 브레이크', cost: 5, damage: 40, block: 0, desc: '피해 40' },
         { key: 'system_down', name: '시스템 다운', cost: 5, damage: 39, block: 0, rewind: 2, desc: '피해 39, 게이지 2칸 되감기' },
         { key: 'infinite_calc', name: '무한 연산', cost: 4, damage: 30, block: 0, draw: 3, desc: '피해 30, 카드 3장 드로우' },
+        { key: 'total_flush', name: '전체 방출', cost: 3, damage: 8, block: 0, discardAll: 11, desc: '피해 8 + 파기한 1장당 피해 11' },
       ],
     },
     BLACK: {
@@ -129,7 +133,8 @@ const TS_DATA = {
   UPGRADES: {
     strike: { damage: 8 }, defend: { block: 8 }, breakthrough: { damage: 13 },
     focus: { draw: 1 }, gigaburst: { damage: 38 },
-    jab: { damage: 5 }, tuneup: { draw: 2 }, rewind: { rewind: 2 },
+    jab: { damage: 7 }, tuneup: { draw: 2 }, rewind: { rewind: 2 },
+    memflush: { discardAll: 7 },
     chain: { damage: 9 }, overload_info: { damage: 4 },
     guard: { block: 12 }, anchor: { damage: 10, block: 5 }, fortify: { block: 7 },
     reboot: { counter: 9 }, threshold: { breakThresholdDown: 2 },
