@@ -29,32 +29,15 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  padding: 24px 12px;
+  padding: 20px 12px;
 }
 
-#app {
-  width: 100%;
-  max-width: 900px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+#app { width: 100%; max-width: 960px; }
+.screen { display: flex; flex-direction: column; gap: 14px; }
+.screen.hidden { display: none; }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-header h1 {
-  font-size: 20px;
-  margin: 0;
-}
-
-header .turn {
-  color: var(--text-dim);
-  font-size: 14px;
-}
+.title { font-size: 26px; margin: 0; text-align: center; }
+.subtitle { margin: 0; text-align: center; color: var(--text-dim); font-size: 13px; }
 
 .panel {
   background: var(--panel);
@@ -63,100 +46,128 @@ header .turn {
   padding: 14px 16px;
 }
 
-.combatant-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+button {
+  background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+  padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  font-family: inherit;
+}
+button:hover { border-color: var(--text-dim); }
+.ghost-btn { background: transparent; color: var(--text-dim); }
+.primary-btn {
+  background: var(--red-dim); border-color: var(--red); font-size: 15px;
+  padding: 12px 28px; align-self: center;
+}
+
+/* ── 덱 선택 ──────────────────────────────────────────────── */
+.deck-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 10px; }
+.deck-card {
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+  padding: 18px; cursor: pointer; text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.deck-card:hover { transform: translateY(-4px); border-color: var(--text-dim); }
+.deck-card .deck-icon { font-size: 40px; }
+.deck-card .deck-name { font-size: 17px; font-weight: 700; margin: 8px 0 6px; }
+.deck-card .deck-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; min-height: 54px; }
+.deck-card .deck-list { font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--panel-border); padding-top: 8px; margin-top: 8px; line-height: 1.6; }
+.deck-card.RED:hover { border-color: var(--red); }
+.deck-card.BLUE:hover { border-color: var(--blue); }
+.deck-card.BLACK:hover { border-color: #8a8aa8; }
+.deck-card.YELLOW:hover { border-color: var(--break); }
+
+/* ── 전투 헤더 ────────────────────────────────────────────── */
+.battle-header { display: flex; justify-content: space-between; align-items: center; }
+.stage-info { display: flex; align-items: center; gap: 10px; }
+.stage-badge {
+  background: var(--red-dim); border: 1px solid var(--red); color: #fff;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+}
+.stage-name { font-size: 14px; color: var(--text-dim); }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.turn-info { font-size: 13px; color: var(--text-dim); }
+
+/* ── 1:1 대전 무대 ────────────────────────────────────────── */
+.arena {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
   gap: 12px;
-}
-
-.combatant-name {
-  font-weight: 600;
-  min-width: 70px;
-}
-
-.hp-bar-track {
-  flex: 1;
-  height: 16px;
-  background: #0e0e15;
-  border-radius: 8px;
-  overflow: hidden;
+  background: linear-gradient(180deg, #1a1a26 0%, #15151f 100%);
   border: 1px solid var(--panel-border);
-}
-
-.hp-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #e64d4d, #ff8080);
-  transition: width 0.35s ease;
-}
-
-.hp-bar-fill.boss { background: linear-gradient(90deg, #7a2c2c, #e64d4d); }
-.hp-bar-fill.player { background: linear-gradient(90deg, #2c7a4d, #4de68a); }
-
-.hp-text {
-  min-width: 90px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.badges {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
-  color: var(--text-dim);
-}
-
-.badge.active.block { color: var(--blue); border-color: var(--blue); }
-.badge.active.power { color: var(--orange); border-color: var(--orange); }
-.badge.active.stun { color: var(--break); border-color: var(--break); }
-.badge.active.weaken { color: var(--text-dim); border-color: var(--text-dim); background: #2a2a38; }
-.badge.active.vulnerable { color: var(--danger); border-color: var(--danger); background: #3a1a1a; }
-
-.boss-skill-legend {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--panel-border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.boss-skill-row.locked { color: var(--danger); }
-
-.gauge-panel { display: flex; flex-direction: column; gap: 10px; }
-
-.gauge-track {
+  border-radius: 12px;
+  padding: 18px 16px;
   position: relative;
-  height: 36px;
+  overflow: hidden;
+}
+.fighter { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fighter .avatar {
+  font-size: 56px; line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+  transition: transform 0.12s ease;
+}
+.enemy-side .avatar { transform: scaleX(-1); }
+.fighter-name { font-size: 14px; font-weight: 600; }
+.versus { align-self: center; color: var(--text-dim); font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+
+.bar-wrap { width: 100%; max-width: 240px; }
+.bar-track {
+  height: 14px; background: #0e0e15; border: 1px solid var(--panel-border);
+  border-radius: 7px; overflow: hidden;
+}
+.bar-fill { height: 100%; transition: width 0.35s ease; }
+.bar-fill.player { background: linear-gradient(90deg, #2c7a4d, #4de68a); }
+.bar-fill.enemy { background: linear-gradient(90deg, #7a2c2c, #e64d4d); }
+.bar-text { text-align: center; font-size: 12px; color: var(--text-dim); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* 공격 모션 */
+@keyframes lungeRight { 0% { transform: translateX(0); } 35% { transform: translateX(26px) scale(1.08); } 100% { transform: translateX(0); } }
+@keyframes lungeLeft  { 0% { transform: scaleX(-1) translateX(0); } 35% { transform: scaleX(-1) translateX(26px) scale(1.08); } 100% { transform: scaleX(-1) translateX(0); } }
+@keyframes shakeHit   { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+@keyframes shakeHitFlip { 0%,100% { transform: scaleX(-1) translateX(0); } 20% { transform: scaleX(-1) translateX(-7px); } 40% { transform: scaleX(-1) translateX(6px); } 60% { transform: scaleX(-1) translateX(-4px); } 80% { transform: scaleX(-1) translateX(3px); } }
+@keyframes buffPulse  { 0%,100% { transform: scale(1); filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); } 50% { transform: scale(1.14); filter: drop-shadow(0 0 18px var(--orange)); } }
+@keyframes buffPulseFlip { 0%,100% { transform: scaleX(-1) scale(1); } 50% { transform: scaleX(-1) scale(1.14); filter: drop-shadow(0 0 18px var(--orange)); } }
+
+.player-side .avatar.attacking { animation: lungeRight 0.42s ease; }
+.enemy-side  .avatar.attacking { animation: lungeLeft 0.42s ease; }
+.player-side .avatar.hit { animation: shakeHit 0.4s ease; }
+.enemy-side  .avatar.hit { animation: shakeHitFlip 0.4s ease; }
+.player-side .avatar.buffing { animation: buffPulse 0.6s ease; }
+.enemy-side  .avatar.buffing { animation: buffPulseFlip 0.6s ease; }
+
+/* 피해/회복 숫자 */
+.fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+@keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, 10px) scale(0.8); } 20% { opacity: 1; transform: translate(-50%, -4px) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -46px) scale(1); } }
+.float-num {
+  position: absolute; left: 50%; top: 26px;
+  font-size: 24px; font-weight: 800; white-space: nowrap;
+  animation: floatUp 1s ease forwards;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+}
+.float-num.dmg { color: var(--danger); }
+.float-num.heal { color: var(--green); }
+.float-num.skill { font-size: 13px; top: 2px; color: var(--orange); font-weight: 700; }
+
+/* BREAK 연출 */
+@keyframes breakFlash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+.break-flash {
+  position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255,210,77,0.55), transparent 65%);
+  animation: breakFlash 0.75s ease forwards;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; font-weight: 900; color: var(--break); letter-spacing: 3px;
+  text-shadow: 0 0 18px rgba(255,210,77,0.9);
 }
 
+/* ── 게이지 ───────────────────────────────────────────────── */
+.gauge-panel { display: flex; flex-direction: column; gap: 10px; }
+.gauge-track { position: relative; height: 36px; }
 .gauge-cells {
-  height: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
+  height: 100%; border-radius: 8px; overflow: hidden; display: flex;
   border: 1px solid var(--panel-border);
 }
-
 .gauge-cell {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: rgba(255,255,255,0.55);
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: rgba(255,255,255,0.55);
   border-right: 1px solid rgba(0,0,0,0.25);
 }
 .gauge-cell:last-child { border-right: none; }
@@ -168,34 +179,35 @@ header .turn {
 .gauge-cell.e-break { background: var(--gauge-e-break); color: #201a00; font-weight: 700; }
 
 .gauge-marker {
-  position: absolute;
-  top: -4px;
-  width: 22px;
-  height: 44px;
-  margin-left: -11px;
+  position: absolute; top: -4px; width: 22px; height: 44px; margin-left: -11px;
   transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+  z-index: 3;
 }
-
 .gauge-marker::after {
-  content: '';
-  width: 0;
-  height: 0;
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
+  content: ''; width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
   border-top: 14px solid #fff;
   filter: drop-shadow(0 0 4px rgba(0,0,0,0.6));
 }
 
+/* 메모리가 떨어지는 연출 */
+.memory-fx { position: absolute; inset: -30px 0 -10px; pointer-events: none; z-index: 2; overflow: visible; }
+@keyframes memoryDrop {
+  0%   { opacity: 0; transform: translate(-50%, -34px) scale(0.6); }
+  25%  { opacity: 1; transform: translate(-50%, -20px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 16px) scale(0.75); }
+}
+.memory-orb {
+  position: absolute; top: 0; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--break) 55%, #a8791a);
+  box-shadow: 0 0 12px rgba(255,210,77,0.85);
+  animation: memoryDrop 0.75s ease forwards;
+}
+
 .intent-preview {
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #14141f;
-  border: 1px solid var(--panel-border);
+  font-size: 13px; padding: 8px 10px; border-radius: 6px;
+  background: #14141f; border: 1px solid var(--panel-border);
 }
 .intent-preview.safe { color: var(--text-dim); }
 .intent-preview.charge { color: var(--gauge-e-safe); }
@@ -204,145 +216,99 @@ header .turn {
 .intent-preview.break { color: var(--break); font-weight: 700; }
 .intent-preview.stunned { color: var(--text-dim); font-style: italic; }
 
-.combo-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--text-dim);
+.boss-skill-legend {
+  padding-top: 8px; border-top: 1px solid var(--panel-border);
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  font-size: 11px; color: var(--text-dim);
 }
+.boss-skill-row.locked { color: var(--danger); }
 
+/* ── 배지 ─────────────────────────────────────────────────── */
+.badges { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--panel-border); color: var(--text-dim);
+}
+.badge.active.block { color: var(--blue); border-color: var(--blue); }
+.badge.active.power { color: var(--orange); border-color: var(--orange); }
+.badge.active.stun { color: var(--break); border-color: var(--break); }
+.badge.active.weaken { color: var(--text-dim); border-color: var(--text-dim); background: #2a2a38; }
+.badge.active.vulnerable { color: var(--danger); border-color: var(--danger); background: #3a1a1a; }
+
+/* ── 콤보 / 손패 ──────────────────────────────────────────── */
+.combo-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-dim); }
 .combo-label { font-weight: 600; color: var(--text); }
-
 .combo-dots { display: flex; gap: 5px; }
-
 .combo-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--panel-border);
-  background: #0e0e15;
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid var(--panel-border); background: #0e0e15;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
-
 .combo-dot.filled { background: var(--break); border-color: var(--break); }
 
-.hand-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  min-height: 130px;
-}
-
+.hand-row { display: flex; gap: 10px; flex-wrap: wrap; min-height: 132px; }
 .card {
-  width: 108px;
-  height: 140px;
+  width: 108px; height: 142px;
   background: linear-gradient(160deg, #2a1414, #1a1010);
-  border: 1px solid var(--red-dim);
-  border-radius: 10px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  cursor: grab;
-  user-select: none;
+  border: 1px solid var(--red-dim); border-radius: 10px; padding: 8px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  cursor: grab; user-select: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-
-.card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.4);
-  border-color: var(--red);
-}
-
+.card:hover { transform: translateY(-6px); box-shadow: 0 8px 16px rgba(0,0,0,0.4); border-color: var(--red); }
 .card.dragging { opacity: 0.4; }
+.card.upgraded { border-color: var(--break); }
+.card.BLUE { background: linear-gradient(160deg, #14202a, #101720); border-color: #2c4a7a; }
+.card.BLUE:hover { border-color: var(--blue); }
+.card.BLACK { background: linear-gradient(160deg, #1c1c22, #131317); border-color: #4a4a5a; }
+.card.BLACK:hover { border-color: #9a9ab0; }
+.card.YELLOW { background: linear-gradient(160deg, #2a2614, #1a1810); border-color: #7a6a2c; }
+.card.YELLOW:hover { border-color: var(--break); }
 
 .card-cost {
-  align-self: flex-start;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--red);
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  align-self: flex-start; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--red); color: #fff; font-weight: 700; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
 }
-
-.card-name {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.card-desc {
-  font-size: 10.5px;
-  color: var(--text-dim);
-  line-height: 1.3;
-}
+.card.BLUE .card-cost { background: var(--blue); }
+.card.BLACK .card-cost { background: #6a6a80; }
+.card.YELLOW .card-cost { background: #b89a2c; }
+.card-name { font-size: 13px; font-weight: 600; }
+.card-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.3; }
 
 .play-zone {
-  border: 2px dashed var(--panel-border);
-  border-radius: 10px;
-  padding: 14px;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
+  border: 2px dashed var(--panel-border); border-radius: 10px; padding: 14px;
+  text-align: center; color: var(--text-dim); font-size: 13px;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
+.play-zone.drag-over { border-color: var(--red); color: var(--red); background: rgba(230,77,77,0.08); }
 
-.play-zone.drag-over {
-  border-color: var(--red);
-  color: var(--red);
-  background: rgba(230, 77, 77, 0.08);
-}
-
-.controls-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.pile-counts {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-button {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  color: var(--text);
-  padding: 8px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-button:hover { border-color: var(--text-dim); }
-button.primary { background: var(--red-dim); border-color: var(--red); }
+.controls-row { display: flex; justify-content: space-between; align-items: center; }
+.pile-counts { font-size: 12px; color: var(--text-dim); }
 
 .log-panel {
-  height: 140px;
-  overflow-y: auto;
-  font-size: 12px;
-  color: var(--text-dim);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  height: 130px; overflow-y: auto; font-size: 12px; color: var(--text-dim);
+  display: flex; flex-direction: column; gap: 3px;
 }
-
 .log-panel div:last-child { color: var(--text); }
 
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 14px;
+/* ── 보상 / 결과 ──────────────────────────────────────────── */
+.reward-heading { font-size: 14px; margin: 8px 0 0; color: var(--text); }
+.reward-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.reward-card {
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px;
+  padding: 14px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease;
 }
+.reward-card:hover { transform: translateY(-4px); border-color: var(--break); }
+.reward-card .rc-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.reward-card .rc-cost { font-size: 11px; color: var(--orange); }
+.reward-card .rc-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; margin-top: 6px; }
 
-.overlay h2 { font-size: 32px; margin: 0; }
-.overlay.hidden { display: none; }
+.upgrade-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.upgrade-chip {
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px;
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+}
+.upgrade-chip:hover { border-color: var(--break); color: var(--break); }
+.reward-actions { display: flex; justify-content: center; margin-top: 6px; }
+.empty-note { font-size: 12px; color: var(--text-dim); }

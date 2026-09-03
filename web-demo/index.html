@@ -8,71 +8,111 @@
 </head>
 <body>
   <div id="app">
-    <header>
-      <h1>Timeline Seesaw — Web Demo</h1>
-      <div class="turn">턴 <span id="turn-count">1</span></div>
-    </header>
 
-    <section class="panel">
-      <div class="combatant-row">
-        <div class="combatant-name">보스</div>
-        <div class="hp-bar-track"><div id="boss-hp-fill" class="hp-bar-fill boss"></div></div>
-        <div class="hp-text" id="boss-hp-text">120 / 120</div>
-      </div>
-      <div class="badges" id="boss-badges"></div>
-      <div class="boss-skill-legend" id="boss-skill-legend"></div>
+    <!-- ── 덱 선택 ───────────────────────────────────────────── -->
+    <section class="screen" id="screen-select">
+      <h1 class="title">Timeline Seesaw</h1>
+      <p class="subtitle">공유 메모리 게이지를 밀고 당기는 덱빌딩 로그라이크 · 스테이지 1~10</p>
+      <div class="deck-grid" id="deck-grid"></div>
     </section>
 
-    <section class="panel gauge-panel">
-      <div class="gauge-track" id="gauge-track">
-        <div class="gauge-cells" id="gauge-cells"></div>
-        <div class="gauge-marker" id="gauge-marker"></div>
+    <!-- ── 전투 ─────────────────────────────────────────────── -->
+    <section class="screen hidden" id="screen-battle">
+      <header class="battle-header">
+        <div class="stage-info">
+          <span class="stage-badge" id="stage-badge">STAGE 1</span>
+          <span class="stage-name" id="stage-name"></span>
+        </div>
+        <div class="header-right">
+          <span class="turn-info">턴 <span id="turn-count">1</span></span>
+          <button id="restart-btn" class="ghost-btn">런 포기</button>
+        </div>
+      </header>
+
+      <!-- 1:1 대전 무대 -->
+      <div class="arena" id="arena">
+        <div class="fighter player-side" id="player-fighter">
+          <div class="fx-layer" id="player-fx"></div>
+          <div class="avatar" id="player-avatar">🔥</div>
+          <div class="fighter-name" id="player-name">플레이어</div>
+          <div class="bar-wrap">
+            <div class="bar-track"><div class="bar-fill hp player" id="player-hp-fill"></div></div>
+            <div class="bar-text" id="player-hp-text">70 / 70</div>
+          </div>
+          <div class="badges" id="player-badges"></div>
+        </div>
+
+        <div class="versus" id="versus">VS</div>
+
+        <div class="fighter enemy-side" id="enemy-fighter">
+          <div class="fx-layer" id="enemy-fx"></div>
+          <div class="avatar" id="enemy-avatar">🗿</div>
+          <div class="fighter-name" id="enemy-name">적</div>
+          <div class="bar-wrap">
+            <div class="bar-track"><div class="bar-fill hp enemy" id="boss-hp-fill"></div></div>
+            <div class="bar-text" id="boss-hp-text">120 / 120</div>
+          </div>
+          <div class="badges" id="boss-badges"></div>
+        </div>
       </div>
-      <div class="intent-preview" id="intent-preview"></div>
+
+      <!-- 공유 메모리 게이지 -->
+      <section class="panel gauge-panel">
+        <div class="gauge-track" id="gauge-track">
+          <div class="gauge-cells" id="gauge-cells"></div>
+          <div class="gauge-marker" id="gauge-marker"></div>
+          <div class="memory-fx" id="memory-fx"></div>
+        </div>
+        <div class="intent-preview" id="intent-preview"></div>
+        <div class="boss-skill-legend" id="boss-skill-legend"></div>
+      </section>
+
+      <section class="play-zone" id="play-zone">카드를 여기로 드래그해 사용 (클릭도 가능)</section>
+
+      <div class="combo-row">
+        <span class="combo-label">콤보</span>
+        <div class="combo-dots" id="combo-dots"></div>
+        <span class="combo-hint">3장 연속 사용 시 카드 1장 추가 드로우</span>
+      </div>
+
+      <section class="panel">
+        <div class="hand-row" id="hand-row"></div>
+      </section>
+
+      <div class="controls-row">
+        <div class="pile-counts" id="pile-counts"></div>
+        <button id="pass-btn">턴 종료 (패스 · 메모리 -3 / 드로우 +1)</button>
+      </div>
+
+      <section class="panel log-panel" id="log-panel"></section>
     </section>
 
-    <section class="panel">
-      <div class="combatant-row">
-        <div class="combatant-name">플레이어</div>
-        <div class="hp-bar-track"><div id="player-hp-fill" class="hp-bar-fill player"></div></div>
-        <div class="hp-text" id="player-hp-text">70 / 70</div>
+    <!-- ── 보상 ─────────────────────────────────────────────── -->
+    <section class="screen hidden" id="screen-reward">
+      <h2 class="title" id="reward-title">스테이지 클리어</h2>
+      <p class="subtitle" id="reward-sub"></p>
+      <h3 class="reward-heading">새 카드 획득 (덱 +1장)</h3>
+      <div class="reward-grid" id="reward-grid"></div>
+      <h3 class="reward-heading">또는 카드 강화 (덱 장수 유지)</h3>
+      <div class="upgrade-grid" id="upgrade-grid"></div>
+      <div class="reward-actions">
+        <button id="skip-reward-btn" class="ghost-btn">둘 다 건너뛰기</button>
       </div>
-      <div class="badges" id="player-badges"></div>
     </section>
 
-    <section class="play-zone" id="play-zone">카드를 이 영역으로 드래그하면 사용합니다 (클릭해도 사용됩니다)</section>
-
-    <div class="combo-row">
-      <span class="combo-label">콤보</span>
-      <div class="combo-dots" id="combo-dots"></div>
-      <span class="combo-hint">3장 연속 사용 시 카드 1장 추가 드로우</span>
-    </div>
-
-    <section class="panel">
-      <div class="hand-row" id="hand-row"></div>
+    <!-- ── 런 종료 ──────────────────────────────────────────── -->
+    <section class="screen hidden" id="screen-result">
+      <h2 class="title" id="result-title">런 종료</h2>
+      <p class="subtitle" id="result-sub"></p>
+      <button id="result-restart-btn" class="primary-btn">새 런 시작</button>
     </section>
 
-    <div class="controls-row">
-      <div class="pile-counts" id="pile-counts"></div>
-      <div style="display:flex; gap:8px;">
-        <button id="pass-btn" title="패스하면 게이지가 보스 쪽으로 3칸 밀리는 대신 카드 1장을 뽑습니다">턴 종료 (패스, 메모리 -3 / 드로우 +1)</button>
-        <button id="restart-btn">다시 시작</button>
-      </div>
-    </div>
-
-    <section class="panel log-panel" id="log-panel"></section>
-  </div>
-
-  <div class="overlay hidden" id="overlay">
-    <h2 id="overlay-title">승리!</h2>
-    <button class="primary" id="overlay-restart">다시 시작</button>
   </div>
 
   <script src="data.js"></script>
   <script src="engine.js"></script>
+  <script src="run.js"></script>
   <script src="ui.js"></script>
-  <script>
-    TS_UI.init();
-  </script>
+  <script>TS_UI.init();</script>
 </body>
 </html>
