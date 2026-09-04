@@ -67,11 +67,14 @@ const TS_DATA = {
       { key: 'memflush', name: '배수일전', cost: 2, damage: 4, block: 0, count: 1, discardAll: 5, desc: '피해 4 + 손패를 전부 파기하고 버린 1장당 피해 5' },
     ],
     BLACK: [
-      { key: 'guard', name: '금강불괴', cost: 1, damage: 0, block: 6, count: 3, desc: '방어도 8' },
-      { key: 'anchor', name: '금강저', cost: 2, damage: 9, block: 3, count: 3, desc: '피해 9, 방어도 3' },
+      { key: 'guard', name: '금강불괴', cost: 1, damage: 0, block: 8, count: 3, desc: '방어도 8' },
+      { key: 'anchor', name: '금강저', cost: 2, damage: 11, block: 3, count: 3, desc: '피해 9, 방어도 3' },
       { key: 'fortify', name: '반석세', cost: 1, damage: 0, block: 4, count: 2, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '반석세', amount: 2, turns: 2 }, desc: '방어도 4, 2합간 합 시작 시 방어도 +2' },
       { key: 'reboot', name: '반탄강기', cost: 2, damage: 0, block: 6, count: 1, counter: 8, desc: '방어도 6, 다음 피격 시 반탄 8' },
-      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 0, count: 1, breakThresholdDown: 1, desc: '이번 전투 파훼 임계점 1 감소' },
+      // 임계점 조작은 "틈이 큰 초식 한 장"과 짝을 이뤄야만 값을 한다 (파훼는
+      // 한 장으로만 낼 수 있으므로). 그 짝이 없으면 완전한 백지 카드가 되므로
+      // 최소한 몸값은 하도록 방어도를 붙였다.
+      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 7, count: 1, breakThresholdDown: 1, desc: '방어도 7, 이번 전투 파훼 임계점 1 감소' },
     ],
     YELLOW: [
       { key: 'siphon', name: '흡성소법', cost: 1, damage: 7, block: 0, count: 3, hpCost: 1, lifesteal: 50, desc: 'HP 1 소모, 피해 7, 입힌 피해의 50% 회복' },
@@ -152,17 +155,17 @@ const TS_DATA = {
         { key: 'check_strike', name: '항마장', cost: 2, damage: 8, block: 4, desc: '피해 8, 방어도 4' },
       ],
       2: [
-        { key: 'heavyarmor', name: '중갑호신', cost: 2, damage: 0, block: 10, desc: '방어도 10' },
+        { key: 'heavyarmor', name: '중갑호신', cost: 2, damage: 0, block: 12, desc: '방어도 10' },
         { key: 'counter_protocol', name: '반탄진기', cost: 2, damage: 0, block: 5, counter: 8, desc: '방어도 5, 다음 피격 시 반탄 8' },
         { key: 'barrier', name: '진법: 나한진', cost: 3, damage: 0, block: 0, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '나한진', amount: 5, turns: 3 }, desc: '3합간 합 시작 시 방어도 +5' },
         { key: 'steel_counter', name: '금강반탄', cost: 3, damage: 19, block: 8, counter: 6, desc: '피해 19, 방어도 8, 반격 6' },
         { key: 'rampart_strike', name: '벽력금강', cost: 3, damage: 5, block: 6, blockToDamage: 1, desc: '피해 5 + 현재 방어도만큼, 방어도 6' },
       ],
       3: [
-        { key: 'absolute_guard', name: '부동명왕', cost: 3, damage: 0, block: 14, desc: '방어도 17' },
-        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 0, breakThresholdDown: 2, desc: '파훼 임계점 2 감소' },
+        { key: 'absolute_guard', name: '부동명왕', cost: 3, damage: 0, block: 20, desc: '방어도 17' },
+        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 16, breakThresholdDown: 2, desc: '방어도 16, 파훼 임계점 2 감소' },
         { key: 'anchor_finish', name: '금강멸적', cost: 5, damage: 39, block: 10, desc: '피해 39, 방어도 10' },
-        { key: 'fortress', name: '철옹금성', cost: 4, damage: 0, block: 18, counter: 10, desc: '방어도 22, 반격 10' },
+        { key: 'fortress', name: '철옹금성', cost: 4, damage: 0, block: 26, counter: 10, desc: '방어도 22, 반격 10' },
         { key: 'crush', name: '항마멸쇄', cost: 6, damage: 47, block: 8, desc: '피해 47, 방어도 8' },
         { key: 'absolute_reflect', name: '만법귀일', cost: 4, damage: 10, block: 12, blockToDamage: 1, desc: '피해 10 + 현재 방어도만큼, 방어도 12' },
       ],
@@ -205,7 +208,7 @@ const TS_DATA = {
     deflect: { evade: 2 }, cloud_step: { evade: 2 }, redirect: { evade: 3 },
     memflush: { discardAll: 7 },
     chain: { damage: 9 }, overload_info: { damage: 4 },
-    guard: { block: 10 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
+    guard: { block: 12 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
     ironwall: { block: 10 }, shield_bash: { damage: 5 }, counter_stance: { counter: 8 },
     check_strike: { damage: 11 },
     reboot: { counter: 9 }, threshold: { breakThresholdDown: 2 },

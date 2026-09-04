@@ -190,7 +190,11 @@ const TS_Engine = (() => {
     return dmg;
   }
 
-  function applyDamageToPlayer(game, rawDamage) {
+  // pierce=true면 방어도를 절반만 인정한다 — 페이즈를 끝내는 "마무리 일격"이
+  // 그냥 막히면 "작게 넘기면 큰 게 온다"는 시소 규칙에 이빨이 없어진다.
+  // 흘리기(흑)는 그보다 먼저 판정되므로 관통과 무관하게 통째로 넘긴다 —
+  // 방어도와 흘리기의 성격이 갈리는 지점이다 (gdd/08 8-4-2).
+  function applyDamageToPlayer(game, rawDamage, pierce) {
     // 흘리기 (흑/무당) — 사량발천근. 방어도처럼 깎는 게 아니라 그 일격을
     // 통째로 넘긴다. 큰 일격일수록 이득이라 방어도(백)와 성격이 다르다.
     if (game.evadeCharges > 0) {
@@ -208,7 +212,8 @@ const TS_Engine = (() => {
       dmg = Math.round(dmg * 1.5);
       game.playerVulnerableActive = false; // 다음 피격 1회 소모
     }
-    const absorbed = Math.min(game.playerBlock, dmg);
+    const usableBlock = pierce ? Math.floor(game.playerBlock / 2) : game.playerBlock;
+    const absorbed = Math.min(usableBlock, dmg);
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
 
@@ -224,7 +229,7 @@ const TS_Engine = (() => {
   }
 
   // ── 보스 기술 선택 (gdd/08 8-4) ────────────────────────────────
-  // 같은 기술을 연속으로 쓸수록 비용이 오른다 (8-4-2)
+  // 같은 기술을 연속으로 쓸수록 비용이 오른다 (8-4-3)
   function effectiveSkillCost(skill, streak) {
     const streakBonus = streak.lastKey === skill.key ? streak.count : 0;
     return Math.max(1, skill.cost + streakBonus);
@@ -237,7 +242,7 @@ const TS_Engine = (() => {
   //   성격에 따라 갈린다 (gdd/08 8-4-1):
   //     패도(DOMINANT) — 가장 비싼 것. 크게 때리고 크게 돌려준다
   //     노회(CRAFTY)  — 예산을 넘기는 것 중 가장 싼 것. 덜 때리고 덜 돌려준다
-  //   노회는 최소 반환 보장(8-4-3)이 있어야만 성립한다. 없으면 착지가 아1로
+  //   노회는 최소 반환 보장(8-4-4)이 있어야만 성립한다. 없으면 착지가 아1로
   //   고정돼 덱 빌드업 자체가 무너졌던 초기 구현이 그대로 재현된다.
   function pickBossSkill(game, cooldowns, streak, gauge) {
     const ready = game.enemySkills.filter((s) => (cooldowns[s.key] || 0) <= 0);
@@ -259,10 +264,10 @@ const TS_Engine = (() => {
     if (streak.lastKey === chosen.skill.key) streak.count += 1;
     else { streak.lastKey = chosen.skill.key; streak.count = 1; }
 
-    return chosen;
+    return { ...chosen, isCloser: affordable.length === 0 };
   }
 
-  // 최소 반환 보장(아3) + 범위 하한 (gdd/08 8-4-3)
+  // 최소 반환 보장(아3) + 범위 하한 (gdd/08 8-4-4)
   function clampReturnedGauge(finalGauge) {
     return Math.max(Math.min(finalGauge, -D.MIN_MOMENTUM_RETURN), D.GAUGE_MIN);
   }
@@ -273,7 +278,7 @@ const TS_Engine = (() => {
     });
   }
 
-  function applyBossSkillEffect(game, skill, cost) {
+  function applyBossSkillEffect(game, skill, cost, isCloser) {
     if (skill.kind === 'BUFF') {
       game.bossScalingPower += skill.powerGain;
       game.bossBlock += skill.blockGain;
@@ -281,7 +286,7 @@ const TS_Engine = (() => {
       pushFx(game, 'enemyBuff', { name: skill.name, cost });
       return;
     }
-    const dmg = applyDamageToPlayer(game, skill.damage + game.bossScalingPower);
+    const dmg = applyDamageToPlayer(game, skill.damage + game.bossScalingPower, isCloser);
     let extra = '';
     if (skill.kind === 'ATTACK_WEAKEN') {
       game.playerWeakenActive = true;
@@ -290,7 +295,7 @@ const TS_Engine = (() => {
       game.playerVulnerableActive = true;
       extra = ' 사혈 노출(다음 피격 +50%).';
     }
-    pushLog(game, `[${skill.name}](틈 ${cost}) — ${dmg} 피해.${extra}`);
+    pushLog(game, `[${skill.name}](틈 ${cost}${isCloser ? ' · 관통' : ''}) — ${dmg} 피해.${extra}`);
     pushFx(game, 'enemyAttack', { name: skill.name, amount: dmg, cost });
   }
 
@@ -301,9 +306,9 @@ const TS_Engine = (() => {
     const streak = { lastKey: null, count: 0 }; // 페이즈 로컬
     while (gauge >= 0 && guard < 50) {
       guard++;
-      const { skill, cost } = pickBossSkill(game, game.bossCooldowns, streak, gauge);
+      const { skill, cost, isCloser } = pickBossSkill(game, game.bossCooldowns, streak, gauge);
       gauge -= cost;
-      applyBossSkillEffect(game, skill, cost);
+      applyBossSkillEffect(game, skill, cost, isCloser);
       if (skill.cooldown > 0) game.bossCooldowns[skill.key] = skill.cooldown;
       if (checkWinLose(game)) break;
     }
@@ -321,13 +326,14 @@ const TS_Engine = (() => {
     let guard = 0;
     while (gauge >= 0 && guard < 50) {
       guard++;
-      const { skill, cost } = pickBossSkill(game, cooldowns, streak, gauge);
+      const { skill, cost, isCloser } = pickBossSkill(game, cooldowns, streak, gauge);
       gauge -= cost;
+      const tag = isCloser ? ' · 관통' : '';
       if (skill.kind === 'BUFF') {
         scaling += skill.powerGain;
-        steps.push(`${skill.name}(틈${cost}, 운기)`);
+        steps.push(`${skill.name}(틈${cost}, 운기${tag})`);
       } else {
-        steps.push(`${skill.name}(틈${cost}, ${skill.damage + scaling}dmg)`);
+        steps.push(`${skill.name}(틈${cost}, ${skill.damage + scaling}dmg${tag})`);
       }
       if (skill.cooldown > 0) cooldowns[skill.key] = skill.cooldown;
     }

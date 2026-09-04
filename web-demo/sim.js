@@ -2,6 +2,7 @@
 // 사용법: 브라우저 콘솔에서
 //   fetch('sim.js').then(r=>r.text()).then(eval);
 //   ['RED','BLUE','BLACK','YELLOW'].map(c => TS_Sim.run(c, 40));
+//   TS_Sim.run(c, 40, { planned: true })   // 계획형 정책으로 비교
 // 간단한 탐욕 AI로 런을 자동 플레이해 클리어율·평균 도달 스테이지·
 // 턴당 카드 사용 수·사망 스테이지 분포를 집계한다.
 window.TS_Sim = (() => {
@@ -31,13 +32,30 @@ window.TS_Sim = (() => {
 
   const usable = (g, c) => !(c.hpCost && c.hpCost >= g.playerHp);
 
-  function autoTurn(g, stat) {
+  // 계획형 정책이 추가로 지키는 규칙. "생각을 많이 하면 얼마나 좋아지는가"를
+  // 재기 위한 것이라, 사람이 실제로 할 법한 판단만 넣는다.
+  //   1) 패 파기는 손패가 충분히 쌓였을 때만 (블루의 핵심 타이밍)
+  //   2) 연계 초식은 앞에 몇 장 깔린 뒤에 (레드의 핵심 순서)
+  //   3) 흘리기는 이미 남아 있으면 겹쳐 쓰지 않는다
+  function planHolds(g, c) {
+    if (c.discardAll && g.hand.length - 1 < 4) return true;
+    if ((c.chain || c.chainBlock) && g.cardsPlayedThisTurn < 2) return true;
+    if (c.evade && g.evadeCharges > 0) return true;
+    return false;
+  }
+
+  function autoTurn(g, stat, planned) {
     const t = g.turn;
     let guard = 0;
     stat.turns++;
     while (g.status === 'PLAYING' && g.turn === t && guard++ < 40) {
       // 1) 턴을 끝내지 않고 낼 수 있는 카드 중 효율 최고
-      const playable = g.hand.filter((c) => usable(g, c) && g.gauge + cost(g, c) - (c.rewind || 0) <= 0);
+      let playable = g.hand.filter((c) => usable(g, c) && g.gauge + cost(g, c) - (c.rewind || 0) <= 0);
+      if (planned) {
+        const kept = playable.filter((c) => !planHolds(g, c));
+        // 전부 보류되면 이번 합엔 낼 게 없다는 뜻이라 보류를 푼다
+        if (kept.length) playable = kept;
+      }
       if (playable.length) {
         playable.sort((a, b) => score(g, b) - score(g, a));
         stat.plays++;
@@ -64,7 +82,8 @@ window.TS_Sim = (() => {
     }
   }
 
-  function run(color, runs) {
+  function run(color, runs, opts) {
+    const planned = !!(opts && opts.planned);
     const stat = { plays: 0, draws: 0, turns: 0, dist: {} };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
@@ -75,7 +94,7 @@ window.TS_Sim = (() => {
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
         if (st.phase === 'BATTLE') {
           if (st.game.status !== 'PLAYING') { R.syncBattleResult(); continue; }
-          autoTurn(st.game, stat);
+          autoTurn(st.game, stat, planned);
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
           const o = st.rewardOptions.slice().sort((a, b) => score(st.game, b) - score(st.game, a));
@@ -88,6 +107,7 @@ window.TS_Sim = (() => {
     }
     return {
       color,
+      policy: planned ? '계획' : '탐욕',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
