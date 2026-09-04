@@ -63,13 +63,13 @@ window.TS_Sim = (() => {
         continue;
       }
       // 2) 합을 끝내야 한다. 무엇으로 끝내느냐가 다음 합을 정한다.
-      //    - 파훼(적max 도달)에 닿는 초식이 있으면 그게 거의 항상 최선이다:
+      //    - 파훼(몰아치기가 빈틈 도달)에 닿는 초식이 있으면 그게 거의 항상 최선이다:
       //      적의 페이즈가 통째로 지워지고 다음 합에 사혈 노출까지 붙는다.
       //    - 아니면 가장 크게 때리는 초식. 그것도 시원찮으면 기세를 카드로 환전.
       let best = null, bv = -1, bestBreaks = false;
       g.hand.filter((c) => usable(g, c)).forEach((c) => {
-        const land = g.gauge + Math.max(0, cost(g, c) - g.pendingCostReduction * 0) - (c.rewind || 0);
-        const breaks = land >= g.breakThreshold;
+        // 파훼는 착지 위치가 아니라 이번 합의 몰아치기 총량으로 난다
+        const breaks = g.momentumSpentThisTurn + cost(g, c) >= g.breakThreshold;
         let v = (c.damage || 0)
           + (c.chain ? c.chain * g.cardsPlayedThisTurn : 0)
           + (c.discardAll ? c.discardAll * (g.hand.length - 1) : 0)

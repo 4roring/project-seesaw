@@ -96,9 +96,12 @@ interface BattleState {
   cardsDiscardedThisTurn: number;  // 패 파기로 버린 장수 — 보충 드로우에 포함
   evadeCharges: number;            // 남은 흘리기 횟수 (흑)
 
+  momentumSpentThisTurn: number;   // 이번 합에 지불한 틈의 합 = 몰아치기.
+                                   // 빈틈 이상이면 파훼 (gdd/02 2-1)
+
   // 적의 개성 두 축 — 전역 상수가 아니라 적 스탯 (gdd/02 2-2, gdd/08 8-4-1)
-  baseBreakThreshold: number;      // 적max 원값. 임계점 축소의 하한 계산용
-  breakThreshold: number;          // 현재 적max
+  baseBreakThreshold: number;      // 빈틈 원값. 빈틈 축소의 하한 계산용
+  breakThreshold: number;          // 현재 빈틈 (파훼에 필요한 한 합의 총 틈)
   closerStyle: 'DOMINANT' | 'CRAFTY';  // 패도 | 노회
 
   drawPile: Card[];

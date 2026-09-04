@@ -13,6 +13,7 @@ const TS_UI = (() => {
       'player-avatar', 'player-name', 'player-hp-fill', 'player-hp-text', 'player-badges', 'player-fx',
       'enemy-avatar', 'enemy-name', 'boss-hp-fill', 'boss-hp-text', 'boss-badges', 'enemy-fx',
       'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'intent-preview', 'boss-skill-legend',
+      'surge-meter',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'reward-title', 'reward-sub', 'reward-grid', 'upgrade-grid', 'skip-reward-btn',
       'result-title', 'result-sub', 'result-restart-btn',
@@ -57,45 +58,35 @@ const TS_UI = (() => {
   }
 
   // ── 전투 ────────────────────────────────────────────────────
-  // 적 쪽 폭(적max)은 적마다 다르므로 전투가 바뀔 때마다 축을 다시 그린다
-  // (gdd/02 2-2). 아 쪽은 항상 6칸.
-  let gaugeMax = null;
-
-  function buildGaugeTrack(maxE) {
-    gaugeMax = maxE;
+  // 기세 축은 아6 ~ 적6 고정. 빈틈은 축의 칸이 아니라 "한 합의 총 틈"이라
+  // 별도로 표시한다 (gdd/02 2-2).
+  function buildGaugeTrack() {
     els['gauge-cells'].innerHTML = '';
-    for (let v = D.GAUGE_MIN; v <= maxE; v++) {
+    for (let v = D.GAUGE_MIN; v <= D.GAUGE_MAX; v++) {
       const cell = document.createElement('div');
-      cell.className = 'gauge-cell ' + zoneClassFor(v, maxE);
+      cell.className = 'gauge-cell ' + zoneClassFor(v);
       cell.textContent = v === 0 ? '0' : v < 0 ? `아${-v}` : `적${v}`;
       els['gauge-cells'].appendChild(cell);
     }
   }
 
-  // 구간 색은 적max에 대한 상대 위치로 정한다 — 절대값으로 두면 적max가
-  // 4인 적에서 "위험" 구간이 아예 안 나온다.
-  function zoneClassFor(v, maxE) {
+  function zoneClassFor(v) {
     if (v < 0) return 'p';
     if (v === 0) return 'neutral';
-    if (v >= maxE) return 'e-break';
-    const ratio = v / maxE;
-    if (ratio <= 0.34) return 'e-safe';
-    if (ratio <= 0.67) return 'e-engage';
+    if (v <= 2) return 'e-safe';
+    if (v <= 4) return 'e-engage';
     return 'e-danger';
   }
 
   function gaugePercent(gauge) {
-    const max = gaugeMax != null ? gaugeMax : D.GAUGE_MAX;
-    const idx = Math.min(gauge, max) - D.GAUGE_MIN;
-    const total = max - D.GAUGE_MIN + 1;
+    const idx = Math.min(Math.max(gauge, D.GAUGE_MIN), D.GAUGE_MAX) - D.GAUGE_MIN;
+    const total = D.GAUGE_MAX - D.GAUGE_MIN + 1;
     return ((idx + 0.5) / total) * 100;
   }
 
   function renderBattle(run) {
     const g = run.game;
     const color = D.COLORS[run.color];
-
-    if (gaugeMax !== g.breakThreshold) buildGaugeTrack(g.breakThreshold);
 
     els['stage-badge'].textContent = `STAGE ${run.stage}`;
     els['stage-name'].textContent = g.enemyRealm
@@ -130,7 +121,7 @@ const TS_UI = (() => {
     addBadge(els['player-badges'], 'block', `흘리기 ${g.evadeCharges}회`, g.evadeCharges > 0);
     addBadge(els['player-badges'], 'power', `다음 초식의 틈 -${g.pendingCostReduction}`, g.pendingCostReduction > 0);
     addBadge(els['player-badges'], 'power', `다음 공격 ${g.pendingDamageMultiplier}배`, g.pendingDamageMultiplier > 1);
-    addBadge(els['player-badges'], 'stun', `파훼 임계점 적${g.breakThreshold}`, g.breakThreshold !== g.baseBreakThreshold);
+    addBadge(els['player-badges'], 'stun', `파훼 임계점 ${g.breakThreshold}`, g.breakThreshold !== g.baseBreakThreshold);
     g.activeEffects.filter((e) => e.kind === 'DAMAGE_BOOST')
       .forEach((e) => addBadge(els['player-badges'], 'power', `${e.name} 피해+${e.amount} (${e.turnsRemaining}합)`, true));
     g.activeEffects.filter((e) => e.kind === 'BLOCK_ON_TURN_START')
@@ -139,6 +130,7 @@ const TS_UI = (() => {
       .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 회복+${e.amount} (${e.turnsRemaining}합)`, true));
 
     els['gauge-marker'].style.left = gaugePercent(g.gauge) + '%';
+    renderSurge(g);
 
     const intent = TS_Engine.previewIntent(g);
     els['intent-preview'].textContent = intent.text;
@@ -162,6 +154,20 @@ const TS_UI = (() => {
     playPendingFx(g);
   }
 
+  // 몰아치기 — 이번 합에 지불한 총 틈. 빈틈에 닿으면 파훼 (gdd/02 2-1)
+  function renderSurge(g) {
+    const el = els['surge-meter'];
+    if (!el) return;
+    const spent = g.momentumSpentThisTurn;
+    const need = g.breakThreshold;
+    const pct = Math.min(100, Math.round((spent / need) * 100));
+    el.className = 'surge-meter' + (spent >= need ? ' ready' : '');
+    el.innerHTML = `<span class="surge-label">몰아치기</span>`
+      + `<span class="surge-bar"><span class="surge-fill" style="width:${pct}%"></span></span>`
+      + `<span class="surge-num">${spent} / ${need}</span>`
+      + `<span class="surge-hint">${spent >= need ? '이대로 선을 넘기면 파훼!' : '한 합에 몰아친 틈이 빈틈을 넘으면 파훼'}</span>`;
+  }
+
   function addBadge(container, cls, text, active) {
     if (!active) return;
     const span = document.createElement('span');
@@ -178,10 +184,14 @@ const TS_UI = (() => {
     const style = g.closerStyle === 'CRAFTY'
       ? { name: '노회', hint: '마무리로 가장 싼 초식 — 얕게 넘겨도 크게 안 돌아온다' }
       : { name: '패도', hint: '마무리로 가장 비싼 초식 — 크게 맞고 크게 돌려받는다' };
+    const need = Math.max(0, g.breakThreshold - g.momentumSpentThisTurn);
     const head = document.createElement('div');
     head.className = 'boss-style-row';
-    head.innerHTML = `<b>파훼 임계점 적${g.breakThreshold}</b> · <b>${style.name}</b>`
-      + `<span class="boss-style-hint">${style.hint}</span>`;
+    head.innerHTML = `<b>빈틈 ${g.breakThreshold}</b> · <b>${style.name}</b>`
+      + `<span class="boss-style-hint">${style.hint}</span>`
+      + `<span class="boss-style-hint">한 합에 틈 ${g.breakThreshold}을 몰아치면 파훼`
+      + (need > 0 ? ` — 지금 ${g.momentumSpentThisTurn}/${g.breakThreshold}` : ' — <b>완성!</b>')
+      + `</span>`;
     els['boss-skill-legend'].appendChild(head);
 
     g.enemySkills.forEach((s) => {
@@ -393,6 +403,7 @@ const TS_UI = (() => {
 
   function init() {
     cacheEls();
+    buildGaugeTrack();
     wireStaticEvents();
     TS_Run.newRun();
     render();

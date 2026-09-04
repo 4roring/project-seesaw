@@ -1,9 +1,9 @@
 // 카드/적/기세 데이터 — gdd/05, 09, 10, 11 문서 기준
 const TS_DATA = {
-  // 기세 축: 아 쪽은 6칸 고정, 적 쪽은 적마다 다르다 (ENEMIES.breakThreshold).
-  // GAUGE_MAX는 그 적max들의 절대 상한일 뿐이다 (gdd/02 2-2).
+  // 기세 축은 아6 ~ 적6 고정이다. 빈틈(breakThreshold)은 게이지 축의 칸이
+  // 아니라 "한 합에 몰아쳐야 하는 총 틈"이므로 별개 눈금이다 (gdd/02 2-2).
   GAUGE_MIN: -6,
-  GAUGE_MAX: 7,
+  GAUGE_MAX: 6,
   STARTING_GAUGE: -3, // 아3
   STARTING_PLAYER_HP: 80,
   HAND_SIZE: 5, // 시작 핸드 크기 (이후로는 사용한 만큼만 보충 — gdd 07 문서)
@@ -74,7 +74,7 @@ const TS_DATA = {
       // 임계점 조작은 "틈이 큰 초식 한 장"과 짝을 이뤄야만 값을 한다 (파훼는
       // 한 장으로만 낼 수 있으므로). 그 짝이 없으면 완전한 백지 카드가 되므로
       // 최소한 몸값은 하도록 방어도를 붙였다.
-      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 7, count: 1, breakThresholdDown: 1, desc: '방어도 7, 이번 전투 파훼 임계점 1 감소' },
+      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 7, count: 1, breakThresholdDown: 2, desc: '방어도 7, 이번 전투 빈틈 2 감소' },
     ],
     YELLOW: [
       { key: 'siphon', name: '흡성소법', cost: 1, damage: 7, block: 0, count: 3, hpCost: 1, lifesteal: 50, desc: 'HP 1 소모, 피해 7, 입힌 피해의 50% 회복' },
@@ -163,7 +163,7 @@ const TS_DATA = {
       ],
       3: [
         { key: 'absolute_guard', name: '부동명왕', cost: 3, damage: 0, block: 20, desc: '방어도 17' },
-        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 16, breakThresholdDown: 2, desc: '방어도 16, 파훼 임계점 2 감소' },
+        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 16, breakThresholdDown: 4, desc: '방어도 16, 빈틈 4 감소' },
         { key: 'anchor_finish', name: '금강멸적', cost: 5, damage: 39, block: 10, desc: '피해 39, 방어도 10' },
         { key: 'fortress', name: '철옹금성', cost: 4, damage: 0, block: 26, counter: 10, desc: '방어도 22, 반격 10' },
         { key: 'crush', name: '항마멸쇄', cost: 6, damage: 47, block: 8, desc: '피해 47, 방어도 8' },
@@ -211,7 +211,7 @@ const TS_DATA = {
     guard: { block: 12 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
     ironwall: { block: 10 }, shield_bash: { damage: 5 }, counter_stance: { counter: 8 },
     check_strike: { damage: 11 },
-    reboot: { counter: 9 }, threshold: { breakThresholdDown: 2 },
+    reboot: { counter: 9 }, threshold: { breakThresholdDown: 3 },
     siphon: { damage: 10 }, firstaid: { heal: 12 }, corrode: { damage: 8 },
     drain_wave: { damage: 20 },
     bloodsuck: { damage: 9 }, life_cycle: { heal: 9 }, endure: { damage: 13 },
@@ -228,16 +228,18 @@ const TS_DATA = {
   // ─────────────────────────────────────────────────────────────
   // 적 로스터 — gdd/10-enemy-roster.md
   // 개성을 만드는 두 축 (수치가 아니라 이 둘이 전술을 바꾼다):
-  //   breakThreshold(적max): 파훼 임계점. 낮을수록 빨리 무너진다 (gdd/02)
+  //   breakThreshold(빈틈): 파훼에 필요한 "한 합의 총 틈". 낮을수록 빨리
+  //     무너진다. 한 합의 평균 몰아치기가 4~6이라 5~6은 자주, 8은 가끔,
+  //     10 이상은 깊은 버퍼를 받은 합에만 가능하다 (gdd/02 2-2)
   //   closerStyle: 'DOMINANT'(패도, 가장 비싼 초식으로 마무리)
   //              | 'CRAFTY'(노회, 예산을 넘기는 것 중 가장 싼 것)  (gdd/08 8-4-1)
-  // 초식의 틈은 1 ~ breakThreshold-1. 모든 적은 틈 1·쿨다운 0의
+  // 초식의 틈은 1~6 (착지 상한이 적6). 모든 적은 틈 1·쿨다운 0의
   // 기본 공격을 가져야 루프 종료가 보장된다 (gdd/10 10-3).
   // ─────────────────────────────────────────────────────────────
   ENEMIES: [
     {
       name: '노상 낭인', icon: '🗡️', realm: '삼류', hp: 75,
-      breakThreshold: 5, closerStyle: 'DOMINANT',
+      breakThreshold: 7, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 2, cooldown: 0, priority: 10 },
         { key: 'power_charge', name: '기수식', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 6, cooldown: 4, priority: 20 },
@@ -247,7 +249,7 @@ const TS_DATA = {
     },
     {
       name: '흑풍 도적', icon: '🪓', realm: '삼류', hp: 85,
-      breakThreshold: 4, closerStyle: 'DOMINANT',
+      breakThreshold: 6, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 2, cooldown: 0, priority: 10 },
         { key: 'dash', name: '흑풍보', cost: 2, kind: 'ATTACK', damage: 4, cooldown: 1, priority: 25 },
@@ -256,7 +258,7 @@ const TS_DATA = {
     },
     {
       name: '철벽 무승', icon: '🛡️', realm: '이류', hp: 95,
-      breakThreshold: 7, closerStyle: 'DOMINANT',
+      breakThreshold: 12, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '장타', cost: 1, kind: 'ATTACK', damage: 3, cooldown: 0, priority: 10 },
         { key: 'plating', name: '금강신공', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 10, cooldown: 4, priority: 20 },
@@ -266,7 +268,7 @@ const TS_DATA = {
     },
     {
       name: '쌍도 자객', icon: '🥷', realm: '이류', hp: 108,
-      breakThreshold: 5, closerStyle: 'CRAFTY',
+      breakThreshold: 9, closerStyle: 'CRAFTY',
       skills: [
         { key: 'normal_attack', name: '스침', cost: 1, kind: 'ATTACK', damage: 3, cooldown: 0, priority: 10 },
         { key: 'slash_combo', name: '연환도', cost: 2, kind: 'ATTACK', damage: 5, cooldown: 1, priority: 25 },
@@ -276,7 +278,7 @@ const TS_DATA = {
     },
     {
       name: '독무 술사', icon: '☠️', realm: '일류', hp: 120,
-      breakThreshold: 6, closerStyle: 'DOMINANT',
+      breakThreshold: 9, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '독침', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
         { key: 'dark_cycle', name: '독공운기', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 8, cooldown: 4, priority: 20 },
@@ -286,11 +288,11 @@ const TS_DATA = {
       ],
     },
     {
-      // 적max 4 = 플레이어의 합도 짧다. HP까지 높으면 짧은 합이 무한 반복되는
-      // 소모전이 되므로, 낮은 적max에는 반드시 낮은 HP를 짝지어 "짧고 굵은
-      // 싸움"으로 만든다 (gdd/10 10-3).
+      // 빈틈이 작으면 자주 파훼당하므로 싸움이 짧아야 한다. 빈틈이 작은데
+      // HP까지 높으면 소모전이 되어 버프가 누적되는 적에게 일방적으로
+      // 유리해진다 (gdd/10 10-3).
       name: '폭혈 광인', icon: '🔥', realm: '일류', hp: 100,
-      breakThreshold: 4, closerStyle: 'DOMINANT',
+      breakThreshold: 6, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '주먹질', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
         { key: 'amplify', name: '폭혈공', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 6, cooldown: 4, priority: 20 },
@@ -299,7 +301,7 @@ const TS_DATA = {
     },
     {
       name: '쌍생 검객', icon: '⚔️', realm: '절정', hp: 150,
-      breakThreshold: 6, closerStyle: 'CRAFTY',
+      breakThreshold: 10, closerStyle: 'CRAFTY',
       skills: [
         { key: 'normal_attack', name: '견제검', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
         { key: 'regroup', name: '쌍생운기', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 10, cooldown: 4, priority: 20 },
@@ -310,7 +312,7 @@ const TS_DATA = {
     },
     {
       name: '심연 마승', icon: '🕯️', realm: '절정', hp: 168,
-      breakThreshold: 5, closerStyle: 'DOMINANT',
+      breakThreshold: 8, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '염주격', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
         { key: 'abyss_expand', name: '심연운기', cost: 3, kind: 'BUFF', powerGain: 2, blockGain: 12, cooldown: 4, priority: 20 },
@@ -320,7 +322,7 @@ const TS_DATA = {
     },
     {
       name: '혈마', icon: '👑', realm: '초절정', hp: 185,
-      breakThreshold: 7, closerStyle: 'DOMINANT',
+      breakThreshold: 12, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '혈조수', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'empower', name: '혈기운용', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 10, cooldown: 4, priority: 20 },
@@ -331,7 +333,7 @@ const TS_DATA = {
     },
     {
       name: '천마', icon: '💀', realm: '화경', hp: 210,
-      breakThreshold: 7, closerStyle: 'CRAFTY',
+      breakThreshold: 13, closerStyle: 'CRAFTY',
       skills: [
         { key: 'normal_attack', name: '무형지기', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'absolute_power', name: '천마신공', cost: 2, kind: 'BUFF', powerGain: 3, blockGain: 14, cooldown: 4, priority: 20 },

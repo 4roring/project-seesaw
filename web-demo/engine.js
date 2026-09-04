@@ -72,6 +72,10 @@ const TS_Engine = (() => {
       comboCounter: 0,
       comboBonusDrawsThisTurn: 0,
       cardsDiscardedThisTurn: 0, // 패 파기 카드로 버린 장수 — 보충 드로우에 포함
+      // 이번 합에 지불한 틈의 합 = "몰아치기". 이 값이 빈틈에 닿으면 파훼
+      // (gdd/02 2-1). 되감기는 빼지 않는다 — 되감기는 더 많이 몰아칠 수 있게
+      // 해주는 수단이므로, 흑(무당)의 "합을 늘린다"가 파훼로 이어진다.
+      momentumSpentThisTurn: 0,
 
       drawPile: buildDeck(config.deck),
       hand: [],
@@ -114,6 +118,7 @@ const TS_Engine = (() => {
     game.comboCounter = 0;
     game.comboBonusDrawsThisTurn = 0;
     game.cardsDiscardedThisTurn = 0;
+    game.momentumSpentThisTurn = 0;
     tickActiveEffects(game);
     drawCards(game, refillCount);
     pushLog(game, `--- ${game.turn}합 시작 (기세 ${gaugeLabel(game.gauge)}) ---`);
@@ -343,13 +348,20 @@ const TS_Engine = (() => {
 
   function previewIntent(game) {
     if (game.gauge <= 0) {
-      return { text: '안전 — 아직 선(先)이 넘어가지 않습니다.', tone: 'safe' };
+      const need = game.breakThreshold - game.momentumSpentThisTurn;
+      if (need <= 0) {
+        return { text: '몰아치기 완성 — 이대로 선을 넘기면 파훼!', tone: 'break' };
+      }
+      return {
+        text: `안전 — 아직 선(先)이 넘어가지 않습니다. (파훼까지 틈 ${need} 더)`,
+        tone: 'safe',
+      };
     }
-    const n = Math.min(game.gauge, game.breakThreshold);
+    const n = Math.min(game.gauge, D.GAUGE_MAX);
     if (game.isBossStunned) {
       return { text: `적${n} 도달 — 적이 무너져 행동하지 못합니다.`, tone: 'stunned' };
     }
-    if (n >= game.breakThreshold) {
+    if (game.momentumSpentThisTurn >= game.breakThreshold) {
       const auraPct = sumEffectAmount(game, 'BOSS_VULNERABLE_AURA');
       return { text: `파훼! 적 행동 취소 + 무너짐 + 다음 합 사혈 노출(+${50 + auraPct}% 피해)`, tone: 'break' };
     }
@@ -372,8 +384,8 @@ const TS_Engine = (() => {
       return;
     }
 
-    if (n >= game.breakThreshold) {
-      pushLog(game, `[파훼!] 적${n} 도달 — 적 행동 취소, 1합 무너짐, 다음 합 사혈 노출.`);
+    if (game.momentumSpentThisTurn >= game.breakThreshold) {
+      pushLog(game, `[파훼!] 이번 합 몰아치기 ${game.momentumSpentThisTurn} — 적 행동 취소, 1합 무너짐, 다음 합 사혈 노출.`);
       pushFx(game, 'break', {});
       game.isBossStunned = true;
       game.bossVulnerableActive = true;
@@ -413,6 +425,7 @@ const TS_Engine = (() => {
 
     const effectiveCost = Math.max(0, card.cost - game.pendingCostReduction);
     game.pendingCostReduction = 0;
+    game.momentumSpentThisTurn += effectiveCost;
 
     game.hand.splice(idx, 1);
     // 소멸(exhaust) 카드는 버린 더미로 가지 않는다 — 메모리를 순증시키는
@@ -500,10 +513,11 @@ const TS_Engine = (() => {
       pushLog(game, '다음 적 공격 피해 -25%.');
     }
     if (card.breakThresholdDown) {
-      // 하한은 적max - 2, 최소 적3 (gdd/02 2-3). 절대값으로 잡으면 임계점이
-      // 낮은 적에겐 무효, 높은 적에겐 파격이 되어 같은 카드가 상대에 따라
-      // 무의미하거나 압도적이 된다.
-      const floor = Math.max(3, game.baseBreakThreshold - 2);
+      // 하한은 빈틈 - 4, 최소 5 (gdd/02 2-3). 절대값으로 잡으면 빈틈이
+      // 작은 적에겐 무효, 큰 적에겐 파격이 되어 같은 카드가 상대에 따라
+      // 무의미하거나 압도적이 된다. 최소 5는 "한 합의 평균 몰아치기"가
+      // 4~6이라, 그 아래로 내리면 매 합 파훼가 나기 때문이다.
+      const floor = Math.max(5, game.baseBreakThreshold - 4);
       const before = game.breakThreshold;
       game.breakThreshold = Math.max(floor, game.breakThreshold - card.breakThresholdDown);
       pushLog(game, before === game.breakThreshold
@@ -553,8 +567,7 @@ const TS_Engine = (() => {
     // 비용은 오른쪽(+), 되감기는 왼쪽(-) — 합산 결과로 턴 종료를 판정
     const rawGauge = game.gauge + effectiveCost - (card.rewind || 0);
     if (rawGauge > 0) {
-      // 적max를 넘긴 초과분은 버린다 — 파훼는 임계점 도달로 이미 확정된다
-      const n = Math.min(rawGauge, game.breakThreshold);
+      const n = Math.min(rawGauge, D.GAUGE_MAX);
       game.gauge = n;
       pushFx(game, 'memory', { to: n });
       pushLog(game, `기세가 ${gaugeLabel(n)}(으)로 넘어가 선이 적에게 넘어갑니다.`);
@@ -573,6 +586,7 @@ const TS_Engine = (() => {
     if (game.status !== 'PLAYING') return;
     const before = game.gauge;
     const pushedGauge = game.gauge + D.DRAW_ACTION_COST;
+    game.momentumSpentThisTurn += D.DRAW_ACTION_COST;
     const handBefore = game.hand.length;
     drawCards(game, D.DRAW_ACTION_CARDS);
     const drawn = game.hand.length - handBefore;
@@ -581,7 +595,7 @@ const TS_Engine = (() => {
       : `숨 고르기 — 뽑을 카드가 없어 기세 ${D.DRAW_ACTION_COST}만 소모했습니다.`);
 
     if (pushedGauge > 0) {
-      const n = Math.min(pushedGauge, game.breakThreshold);
+      const n = Math.min(pushedGauge, D.GAUGE_MAX);
       game.gauge = n;
       pushFx(game, 'memory', { to: n });
       endPlayerTurnAndResolveBoss(game, n);

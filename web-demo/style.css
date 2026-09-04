@@ -324,3 +324,27 @@ button:hover { border-color: var(--text-dim); }
 }
 .boss-style-hint { opacity: 0.72; font-size: 11px; }
 .deck-color { opacity: 0.7; font-weight: 400; }
+
+/* 몰아치기 — 한 합에 지불한 총 틈 / 파훼 임계점 (gdd/02 2-1) */
+.surge-meter {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; margin: 8px 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+.surge-label { font-weight: 600; opacity: 0.85; }
+.surge-bar {
+  position: relative; flex: 0 0 160px; height: 8px;
+  border-radius: 4px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+.surge-fill {
+  position: absolute; inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #c9a227, #e2574c);
+  transition: width 160ms ease;
+}
+.surge-num { font-variant-numeric: tabular-nums; opacity: 0.9; }
+.surge-hint { opacity: 0.6; font-size: 11px; }
+.surge-meter.ready { background: rgba(226, 87, 76, 0.18); }
+.surge-meter.ready .surge-hint { opacity: 0.95; color: #ffb3ad; }
