@@ -82,17 +82,22 @@ const TS_Run = (() => {
     }
   }
 
-  // 방금 클리어한 스테이지 기준 티어 (gdd/09 9-3)
+  // 방금 클리어한 스테이지 기준 티어 (gdd/09 9-3).
+  // 보상은 "다음 스테이지에서 쓸 카드"이므로 한 칸 앞당겨 준다 — 스테이지 4~7을
+  // 티어2로, 8~10을 티어3으로 싸우려면 3·7 클리어 시점에 그 티어가 열려야 한다.
+  // (앞당기기 전에는 티어3 없이 스테이지 8을 맞아 사망이 몰렸다.)
   function tierForClearedStage(stage) {
-    if (stage <= 3) return 1;
-    if (stage <= 7) return 2;
+    if (stage <= 2) return 1;
+    if (stage <= 6) return 2;
     return 3;
   }
 
   function poolForTier(tier) {
     const pools = D.REWARD_POOLS[state.color] || {};
-    if (tier === 1) return expandStarter(state.color).map((c) => ({ ...c }));
-    if (tier === 2) return [...(pools[2] || []), ...expandStarter(state.color)];
+    // unique 카드는 시작 덱의 1장이 전부 — 보상으로 복사본이 나오면 안 된다
+    const starter = expandStarter(state.color).filter((c) => !c.unique).map((c) => ({ ...c }));
+    if (tier === 1) return [...(pools[1] || []), ...starter];
+    if (tier === 2) return [...(pools[2] || []), ...(pools[1] || []), ...starter];
     return [...(pools[3] || []), ...(pools[2] || [])];
   }
 
@@ -135,6 +140,9 @@ const TS_Run = (() => {
     if (patch.rewind) parts.push(`되감기 ${patch.rewind}`);
     if (patch.counter) parts.push(`반격 ${patch.counter}`);
     if (patch.breakThresholdDown) parts.push(`BREAK 기준값 -${patch.breakThresholdDown}`);
+    if (patch.chain) parts.push(`연계 피해 ${patch.chain}`);
+    if (patch.chainBlock) parts.push(`연계 방어도 ${patch.chainBlock}`);
+    if (patch.lifesteal) parts.push(`흡혈 ${patch.lifesteal}%`);
     return parts.length ? `${parts.join(', ')} (강화)` : `${card.desc} (강화)`;
   }
 

@@ -14,7 +14,7 @@
 | [04-turn-loop-state-machine.md](04-turn-loop-state-machine.md) | 전투 턴 루프 및 상태 머신 다이어그램 |
 | [05-mvp-spec.md](05-mvp-spec.md) | 웹 데모용 데이터 모델, 카드 세트, 보스 스펙 |
 | [06-persistent-effects.md](06-persistent-effects.md) | 테이머/옵션형 지속 효과(N턴 지속 버프) 시스템 |
-| [07-turn-economy-revision.md](07-turn-economy-revision.md) | 패스 메모리 리스크, 핸드 유지형 드로우, 콤보 드로우 |
+| [07-turn-economy-revision.md](07-turn-economy-revision.md) | 드로우 액션(메모리→카드), 핸드 유지형 드로우, 콤보 드로우 |
 | [08-boss-skill-loop.md](08-boss-skill-loop.md) | 보스 기술 루프 — 게이지가 음수가 될 때까지 반복 행동 (턴 종료 규칙과 대칭) |
 | [09-run-structure.md](09-run-structure.md) | 런 구조 — 스테이지 1~10, 덱 성장 곡선(10장→20장), 스테이지 간 회복 |
 | [10-enemy-roster.md](10-enemy-roster.md) | 스테이지별 적 10종 스탯/기술 구성 |

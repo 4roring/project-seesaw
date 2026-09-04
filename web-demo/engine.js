@@ -388,7 +388,10 @@ const TS_Engine = (() => {
     game.pendingCostReduction = 0;
 
     game.hand.splice(idx, 1);
-    game.discardPile.push(card);
+    // 소멸(exhaust) 카드는 버린 더미로 가지 않는다 — 메모리를 순증시키는
+    // 카드가 다시 섞여 들어오면 한 턴이 무한히 늘어난다.
+    if (card.exhaust) pushLog(game, `[${card.name}] 소멸 — 이번 전투에서 사라집니다.`);
+    else game.discardPile.push(card);
 
     // 패 파기 (블루) — 남은 손패를 전부 버리고 버린 장수만큼 피해를 더한다.
     // 파기한 장수는 다음 턴 보충 드로우에 포함되므로 손패가 줄지 않는다.
@@ -407,6 +410,19 @@ const TS_Engine = (() => {
     }
 
     let effectiveDamage = card.damage + discardBonus;
+    // 연계 (레드) — 이번 턴에 "이미" 사용한 카드 수만큼 가산. cardsPlayedThisTurn은
+    // 이 아래에서 증가하므로 자기 자신은 세지 않는다.
+    if (card.chain) {
+      const bonus = card.chain * game.cardsPlayedThisTurn;
+      effectiveDamage += bonus;
+      if (bonus > 0) pushLog(game, `연계 ${game.cardsPlayedThisTurn}장 — 추가 피해 ${bonus}.`);
+    }
+    // 방어도 환산 (블랙) — 카드 자신의 방어도는 아래에서 붙으므로 포함되지 않는다.
+    if (card.blockToDamage) {
+      const bonus = game.playerBlock * card.blockToDamage;
+      effectiveDamage += bonus;
+      pushLog(game, `방어도 ${game.playerBlock} 환산 — 추가 피해 ${bonus}.`);
+    }
     if (effectiveDamage > 0) {
       effectiveDamage *= game.pendingDamageMultiplier;
       game.pendingDamageMultiplier = 1;
@@ -422,12 +438,19 @@ const TS_Engine = (() => {
       const dealt = applyDamageToBoss(game, effectiveDamage);
       pushLog(game, `[${card.name}] 사용 — ${dealt} 피해.`);
       pushFx(game, 'playerAttack', { amount: dealt, label: card.name });
+      // 흡혈 (옐로우) — 입힌 피해의 N%를 회복
+      if (card.lifesteal) {
+        const healed = healPlayer(game, Math.round(dealt * card.lifesteal / 100));
+        if (healed > 0) pushLog(game, `흡혈 — 체력 +${healed}.`);
+      }
     } else {
       pushLog(game, `[${card.name}] 사용.`);
     }
-    if (card.block > 0) {
-      game.playerBlock += card.block;
-      pushLog(game, `방어도 +${card.block}.`);
+    const blockGain = (card.block || 0)
+      + (card.chainBlock ? card.chainBlock * game.cardsPlayedThisTurn : 0);
+    if (blockGain > 0) {
+      game.playerBlock += blockGain;
+      pushLog(game, `방어도 +${blockGain}.`);
     }
     if (card.heal) {
       const healed = healPlayer(game, card.heal);
@@ -504,15 +527,20 @@ const TS_Engine = (() => {
     }
   }
 
-  // 게이지를 넘기지 않고 스스로 턴을 마치는 "패스" — 메모리 3을 상납하는
-  // 대신 카드 1장을 뽑는다 (gdd/07 7-1)
-  function passTurn(game) {
+  // "드로우" 액션 — 메모리를 카드로 환전하는 공통 행동 (gdd/07 7-1).
+  // 비용 2짜리 카드를 낸 것과 동일하게 처리되므로, 게이지가 0을 넘으면
+  // 그대로 턴이 끝난다. 별도의 "패스"는 없다 — 턴을 넘기려면 반드시
+  // 메모리를 밀어야 하고, 그 대가로 항상 카드를 받는다.
+  function drawAction(game) {
     if (game.status !== 'PLAYING') return;
     const before = game.gauge;
-    const pushedGauge = game.gauge + D.PASS_MEMORY_PENALTY;
-    pushLog(game, `패스 — 메모리 ${D.PASS_MEMORY_PENALTY} 상납 (${gaugeLabel(before)} → ${gaugeLabel(Math.min(pushedGauge, D.GAUGE_MAX))}).`);
-    drawCards(game, D.PASS_BONUS_DRAW);
-    pushLog(game, `패스 보상으로 카드 ${D.PASS_BONUS_DRAW}장 드로우.`);
+    const pushedGauge = game.gauge + D.DRAW_ACTION_COST;
+    const handBefore = game.hand.length;
+    drawCards(game, D.DRAW_ACTION_CARDS);
+    const drawn = game.hand.length - handBefore;
+    pushLog(game, drawn > 0
+      ? `드로우 — 메모리 ${D.DRAW_ACTION_COST} 소모 (${gaugeLabel(before)} → ${gaugeLabel(Math.min(pushedGauge, D.GAUGE_MAX))}), 카드 ${drawn}장.`
+      : `드로우 — 뽑을 카드가 없어 메모리 ${D.DRAW_ACTION_COST}만 소모했습니다.`);
 
     if (pushedGauge > 0) {
       const n = Math.min(pushedGauge, D.GAUGE_MAX);
@@ -520,12 +548,12 @@ const TS_Engine = (() => {
       pushFx(game, 'memory', { to: n });
       endPlayerTurnAndResolveBoss(game, n);
     } else {
+      // 0을 넘지 않았으면 턴은 계속된다 — 카드를 낸 것과 완전히 동일하다.
+      // (구 "패스"는 여기서 턴을 넘겼지만, 드로우는 턴 종료 행동이 아니다.)
       game.gauge = pushedGauge;
       pushFx(game, 'memory', { to: game.gauge });
-      game.turn += 1;
-      startPlayerTurn(game);
     }
   }
 
-  return { createGame, playCard, passTurn, previewIntent, gaugeLabel, buildDeck };
+  return { createGame, playCard, drawAction, previewIntent, gaugeLabel, buildDeck };
 })();

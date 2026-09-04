@@ -13,7 +13,7 @@ const TS_UI = (() => {
       'player-avatar', 'player-name', 'player-hp-fill', 'player-hp-text', 'player-badges', 'player-fx',
       'enemy-avatar', 'enemy-name', 'boss-hp-fill', 'boss-hp-text', 'boss-badges', 'enemy-fx',
       'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'intent-preview', 'boss-skill-legend',
-      'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'pass-btn', 'log-panel',
+      'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'reward-title', 'reward-sub', 'reward-grid', 'upgrade-grid', 'skip-reward-btn',
       'result-title', 'result-sub', 'result-restart-btn',
     ].forEach((id) => { els[id] = $(id); });
@@ -350,10 +350,12 @@ const TS_UI = (() => {
       if (uid) doPlayCard(uid);
     });
 
-    els['pass-btn'].addEventListener('click', () => {
+    // 드로우 액션 — 비용 2짜리 카드와 동일하게 처리되며, 게이지가 0을
+    // 넘으면 그대로 턴이 끝난다 (gdd/07 7-1)
+    els['draw-btn'].addEventListener('click', () => {
       const run = TS_Run.get();
       if (run.phase !== 'BATTLE') return;
-      TS_Engine.passTurn(run.game);
+      TS_Engine.drawAction(run.game);
       afterAction();
     });
 

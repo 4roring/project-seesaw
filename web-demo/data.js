@@ -6,8 +6,8 @@ const TS_DATA = {
   STARTING_GAUGE: -3, // P3
   STARTING_PLAYER_HP: 80,
   HAND_SIZE: 5, // 시작 핸드 크기 (이후로는 사용한 만큼만 보충 — gdd 07 문서)
-  PASS_MEMORY_PENALTY: 3, // 패스 시 보스에게 상납하는 메모리(게이지 이동량)
-  PASS_BONUS_DRAW: 1, // 메모리 상납 직후 보상으로 드로우하는 카드 수
+  DRAW_ACTION_COST: 2, // "드로우" 액션의 메모리 비용 (게이지를 보스 쪽으로 미는 양)
+  DRAW_ACTION_CARDS: 1, // "드로우" 액션으로 뽑는 카드 수
   COMBO_THRESHOLD: 3, // 이번 턴 카드 사용 수가 이 값에 도달할 때마다 추가 드로우
   MIN_MEMORY_RETURN: 3, // 보스 페이즈가 끝날 때 보장되는 최소 메모리(P3)
   STAGE_HEAL_RATIO: 0.5, // 스테이지 클리어 후 잃은 체력의 50% 회복 (gdd 09 문서 9-4)
@@ -16,11 +16,21 @@ const TS_DATA = {
   // ─────────────────────────────────────────────────────────────
   // 카드 효과 필드 (gdd/05-mvp-spec.md 5-1)
   //   effect: 태그형 1회성/지속 효과
-  //   draw / rewind / heal / hpCost / counter / breakThresholdDown / bossWeaken:
-  //     숫자 필드로 표현되는 단순 효과 (여러 개 동시 적용 가능)
+  //   draw / rewind / heal / hpCost / counter / breakThresholdDown / bossWeaken /
+  //   discardAll: 숫자 필드로 표현되는 단순 효과 (여러 개 동시 적용 가능)
+  //   chain / chainBlock (레드): 이번 턴에 이미 사용한 카드 1장당 피해/방어도 가산
+  //   blockToDamage (블랙): 현재 방어도 x N 만큼 피해에 가산
+  //   lifesteal (옐로우): 입힌 피해의 N%를 체력으로 회복
+  //   unique: 덱에 1장만 존재. 보상 풀에서 제외된다
+  //   exhaust: 사용 후 버린 더미로 가지 않고 이번 전투에서 소멸
+  //
+  // [불변 규칙] 되감기 카드는 반드시 cost - rewind >= 1 이어야 한다.
+  //   버린 더미는 다시 섞여 들어오므로, 메모리 순증(cost <= rewind) 카드는
+  //   장수와 무관하게 한 턴을 무한히 늘리는 영구기관이 된다. 순증 카드를
+  //   만들려면 exhaust(소멸)로 1회용임을 보장해야 한다.
   // ─────────────────────────────────────────────────────────────
   COLORS: {
-    RED: { name: '레드', icon: '🔥', desc: '고코스트 피니셔로 한 방에 BREAK를 노리는 화력 덱' },
+    RED: { name: '레드', icon: '🔥', desc: '카드를 모아 한 턴에 연계로 폭발시키는 화력 덱' },
     BLUE: { name: '블루', icon: '💧', desc: '드로우와 게이지 되감기로 턴을 길게 끄는 테크니컬 덱' },
     BLACK: { name: '블랙', icon: '🛡️', desc: '방어도와 반격, BREAK 임계점 조작으로 버티는 방어 덱' },
     YELLOW: { name: '옐로우', icon: '✨', desc: '체력을 자원으로 쓰고 회복으로 버티는 줄타기 덱' },
@@ -28,19 +38,22 @@ const TS_DATA = {
 
   // 시작 덱 (컬러별 10장) — gdd/11-card-tiers.md
   STARTER_DECKS: {
+    // 레드는 "여러 장을 모아 한 턴에 연계로 터뜨리는" 덱 — chain 카드가 축이다.
     RED: [
-      { key: 'strike', name: '베기', cost: 1, damage: 5, block: 0, count: 3, desc: '피해 5' },
-      { key: 'defend', name: '수비', cost: 1, damage: 0, block: 5, count: 3, desc: '방어도 5' },
+      { key: 'strike', name: '베기', cost: 1, damage: 5, block: 0, count: 2, desc: '피해 5' },
+      { key: 'defend', name: '수비', cost: 1, damage: 0, block: 5, count: 2, desc: '방어도 5' },
+      { key: 'brace', name: '준비 자세', cost: 1, damage: 0, block: 4, count: 1, chainBlock: 3, desc: '방어도 4 + 이번 턴에 쓴 카드 1장당 방어도 3' },
       { key: 'breakthrough', name: '돌파', cost: 2, damage: 9, block: 0, count: 2, effect: 'REDUCE_NEXT_COST', desc: '피해 9, 다음 카드 비용 -1' },
       { key: 'focus', name: '기 모으기', cost: 1, damage: 0, block: 0, count: 1, effect: 'DOUBLE_NEXT_ATTACK', desc: '다음 공격 카드 피해 2배' },
-      { key: 'gigaburst', name: '기간틱 버스트', cost: 5, damage: 28, block: 0, count: 1, desc: '피해 28' },
+      { key: 'chainstrike', name: '연계 강타', cost: 1, damage: 3, block: 0, count: 1, chain: 4, desc: '피해 3 + 이번 턴에 쓴 카드 1장당 피해 4' },
+      { key: 'chain_burst', name: '연계 폭발', cost: 3, damage: 8, block: 0, count: 1, chain: 7, desc: '피해 8 + 이번 턴에 쓴 카드 1장당 피해 7' },
     ],
     BLUE: [
       { key: 'jab', name: '연타', cost: 1, damage: 5, block: 0, count: 3, desc: '피해 5' },
       { key: 'tuneup', name: '회로 정비', cost: 1, damage: 0, block: 0, count: 2, draw: 1, desc: '카드 1장 드로우' },
-      // 비용 0 + 되감기 1 = 메모리 순증 +1. 비용 1로 1칸 되돌리면 순증 0이라
-      // 아무 의미가 없어서, 강한 대신 1장만 넣는다.
-      { key: 'rewind', name: '메모리 되감기', cost: 0, damage: 0, block: 0, count: 1, rewind: 1, desc: '비용 0 · 메모리 1 회복 (게이지 P쪽 1칸)' },
+      // 메모리 순증 카드라 소멸(1회용)이 필수 — 안 그러면 덱이 다시 섞이면서
+      // 무한히 재사용된다. 1회용인 대신 되감기 2로 크게 되돌린다.
+      { key: 'rewind', name: '메모리 되감기', cost: 0, damage: 0, block: 0, count: 1, unique: true, exhaust: true, rewind: 2, desc: '비용 0 · 메모리 2 회복 · 사용 후 소멸' },
       { key: 'chain', name: '연쇄 반응', cost: 2, damage: 12, block: 0, count: 1, draw: 1, desc: '피해 12, 카드 1장 드로우' },
       { key: 'overload_info', name: '정보 과부하', cost: 1, damage: 5, block: 0, count: 2, draw: 1, desc: '피해 5, 카드 1장 드로우' },
       // 패 파기 페이오프 — 블루는 드로우로 손패를 쌓으므로 그걸 화력으로 환전한다.
@@ -48,45 +61,68 @@ const TS_DATA = {
       { key: 'memflush', name: '메모리 방출', cost: 2, damage: 4, block: 0, count: 1, discardAll: 5, desc: '피해 4 + 손패를 전부 파기하고 버린 1장당 피해 5' },
     ],
     BLACK: [
-      { key: 'guard', name: '강건한 수비', cost: 1, damage: 0, block: 8, count: 3, desc: '방어도 8' },
-      { key: 'anchor', name: '앵커 강타', cost: 2, damage: 11, block: 3, count: 3, desc: '피해 11, 방어도 3' },
+      { key: 'guard', name: '강건한 수비', cost: 1, damage: 0, block: 7, count: 3, desc: '방어도 8' },
+      { key: 'anchor', name: '앵커 강타', cost: 2, damage: 9, block: 3, count: 3, desc: '피해 9, 방어도 3' },
       { key: 'fortify', name: '굳히기', cost: 1, damage: 0, block: 4, count: 2, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '굳히기', amount: 2, turns: 2 }, desc: '방어도 4, 2턴간 턴 시작 시 방어도 +2' },
       { key: 'reboot', name: '재부팅', cost: 2, damage: 0, block: 6, count: 1, counter: 8, desc: '방어도 6, 다음 피격 시 반격 8' },
       { key: 'threshold', name: '임계점 압박', cost: 2, damage: 0, block: 0, count: 1, breakThresholdDown: 1, desc: '이번 전투 BREAK 기준값 1 감소 (최소 E4)' },
     ],
     YELLOW: [
-      { key: 'siphon', name: '생명 착취', cost: 1, damage: 9, block: 0, count: 3, hpCost: 1, desc: 'HP 1 소모, 피해 9' },
-      { key: 'firstaid', name: '응급 처치', cost: 1, damage: 0, block: 0, count: 3, heal: 5, desc: '체력 5 회복' },
+      { key: 'siphon', name: '생명 착취', cost: 1, damage: 7, block: 0, count: 3, hpCost: 1, lifesteal: 50, desc: 'HP 1 소모, 피해 7, 입힌 피해의 50% 회복' },
+      { key: 'firstaid', name: '응급 처치', cost: 1, damage: 0, block: 0, count: 3, heal: 8, desc: '체력 8 회복' },
       { key: 'corrode', name: '부식', cost: 2, damage: 7, block: 0, count: 2, bossWeaken: true, desc: '피해 7, 다음 보스 공격 피해 -25%' },
-      { key: 'regen', name: '재생 오라', cost: 1, damage: 0, block: 0, count: 1, effect: 'PERSISTENT_HEAL_ON_TURN_START', persistentPayload: { id: 'aura-heal-on-turn', name: '재생 오라', amount: 3, turns: 2 }, desc: '2턴간 턴 시작 시 체력 3 회복' },
+      { key: 'regen', name: '재생 오라', cost: 1, damage: 0, block: 0, count: 1, effect: 'PERSISTENT_HEAL_ON_TURN_START', persistentPayload: { id: 'aura-heal-on-turn', name: '재생 오라', amount: 5, turns: 2 }, desc: '2턴간 턴 시작 시 체력 5 회복' },
       { key: 'resolve', name: '결의', cost: 1, damage: 13, block: 0, count: 1, hpCost: 2, desc: 'HP 2 소모, 피해 13' },
     ],
   },
 
-  // 보상 카드 풀 — 티어2는 스테이지 4~7, 티어3은 8~10 (gdd/09 9-3)
+  // 보상 카드 풀 — 티어1은 스테이지 1~3, 티어2는 4~7, 티어3은 8~10 (gdd/09 9-3)
+  // 티어1 풀은 시작 덱과 함께 섞여 나온다 (시작 덱 복사본만 나오던 문제 해소).
   REWARD_POOLS: {
     RED: {
+      1: [
+        { key: 'rapid_slash', name: '연속 베기', cost: 1, damage: 4, block: 0, chain: 3, desc: '피해 4 + 이번 턴에 쓴 카드 1장당 피해 3' },
+        { key: 'counter_rage', name: '분노의 반격', cost: 2, damage: 8, block: 6, desc: '피해 8, 방어도 6' },
+        { key: 'chain_wall', name: '연계 방벽', cost: 1, damage: 0, block: 2, chainBlock: 4, desc: '방어도 2 + 이번 턴에 쓴 카드 1장당 방어도 4' },
+        { key: 'flame_edge', name: '화염 손날', cost: 2, damage: 11, block: 0, desc: '피해 11' },
+        { key: 'ignite', name: '점화', cost: 1, damage: 4, block: 0, effect: 'REDUCE_NEXT_COST', desc: '피해 4, 다음 카드 비용 -1' },
+        { key: 'double_load', name: '이중 장전', cost: 2, damage: 6, block: 0, draw: 1, desc: '피해 6, 카드 1장 드로우' },
+      ],
       2: [
         { key: 'tamer_overdrive', name: '테이머: 폭주 코어', cost: 3, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '폭주 코어', amount: 3, turns: 3 }, desc: '3턴간 공격 카드 피해 +3' },
         { key: 'option_warmup', name: '옵션: 예열 가속', cost: 1, damage: 0, block: 0, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '예열 가속', amount: 4, turns: 2 }, desc: '2턴간 턴 시작 시 방어도 +4' },
         { key: 'option_crackshot', name: '옵션: 균열탄', cost: 2, damage: 13, block: 0, effect: 'PERSISTENT_BOSS_VULNERABLE', persistentPayload: { id: 'aura-boss-vulnerable', name: '균열탄', amount: 10, turns: 2 }, desc: '피해 13, 2턴간 보스 받는 피해 +10%' },
         { key: 'flame_combo', name: '화염 연격', cost: 3, damage: 20, block: 0, desc: '피해 20' },
+        { key: 'chain_storm', name: '연격 폭풍', cost: 3, damage: 8, block: 0, chain: 5, desc: '피해 8 + 이번 턴에 쓴 카드 1장당 피해 5' },
+        { key: 'heat_vent', name: '과열 배출', cost: 2, damage: 9, block: 0, chainBlock: 4, desc: '피해 9 + 이번 턴에 쓴 카드 1장당 방어도 4' },
       ],
       3: [
         { key: 'ultimate_core', name: '궁극 코어 각성', cost: 4, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '궁극 코어', amount: 6, turns: 4 }, desc: '4턴간 공격 카드 피해 +6' },
         { key: 'final_detonation', name: '종언의 폭발', cost: 5, damage: 40, block: 0, effect: 'PERSISTENT_BOSS_VULNERABLE', persistentPayload: { id: 'aura-boss-vulnerable', name: '종언의 폭발', amount: 20, turns: 3 }, desc: '피해 40, 3턴간 보스 받는 피해 +20%' },
         { key: 'decisive', name: '결전의 일격', cost: 6, damage: 48, block: 0, desc: '피해 48 (중립에서 쓰면 곧바로 BREAK)' },
         { key: 'overdrive_chain', name: '폭주 연쇄', cost: 4, damage: 31, block: 0, draw: 1, desc: '피해 31, 카드 1장 드로우' },
-        { key: 'supernova', name: '초신성', cost: 6, damage: 48, block: 0, desc: '피해 48' },
+        { key: 'chain_finale', name: '연계 종막', cost: 5, damage: 20, block: 0, chain: 10, desc: '피해 20 + 이번 턴에 쓴 카드 1장당 피해 10' },
+        { key: 'final_chain', name: '최종 연계', cost: 4, damage: 12, block: 0, chain: 8, desc: '피해 12 + 이번 턴에 쓴 카드 1장당 피해 8' },
+        { key: 'blaze_dance', name: '폭염 난무', cost: 3, damage: 6, block: 0, chain: 7, draw: 1, desc: '피해 6 + 이번 턴에 쓴 카드 1장당 피해 7, 카드 1장 드로우' },
+        { key: 'heat_armor', name: '과열 장갑', cost: 3, damage: 8, block: 10, chainBlock: 6, desc: '피해 8, 방어도 10 + 이번 턴에 쓴 카드 1장당 방어도 6' },
       ],
     },
     BLUE: {
+      1: [
+        { key: 'datashard', name: '데이터 조각', cost: 1, damage: 6, block: 0, desc: '피해 6' },
+        { key: 'parallel_scan', name: '분산 처리', cost: 1, damage: 0, block: 0, draw: 2, desc: '카드 2장 드로우' },
+        { key: 'backup_circuit', name: '백업 회로', cost: 2, damage: 4, block: 6, desc: '피해 4, 방어도 6' },
+        { key: 'calc_boost', name: '연산 가속', cost: 2, damage: 8, block: 0, draw: 1, desc: '피해 8, 카드 1장 드로우' },
+        { key: 'delay_loop', name: '지연 루프', cost: 2, damage: 0, block: 8, rewind: 1, desc: '방어도 8, 게이지 1칸 되감기' },
+      ],
       2: [
-        { key: 'datastream', name: '데이터 스트림', cost: 2, damage: 0, block: 0, draw: 2, desc: '카드 2장 드로우' },
+        { key: 'datastream', name: '데이터 스트림', cost: 2, damage: 10, block: 0, draw: 2, desc: '피해 10, 카드 2장 드로우' },
         { key: 'hack', name: '시스템 해킹', cost: 2, damage: 13, block: 0, rewind: 1, desc: '피해 13, 게이지 1칸 되감기' },
         { key: 'cache_amp', name: '옵션: 캐시 증폭', cost: 2, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '캐시 증폭', amount: 2, turns: 3 }, desc: '3턴간 공격 카드 피해 +2' },
         { key: 'parallel', name: '병렬 처리', cost: 3, damage: 19, block: 0, draw: 1, desc: '피해 19, 카드 1장 드로우' },
         { key: 'cache_burn', name: '캐시 소각', cost: 2, damage: 6, block: 0, discardAll: 7, desc: '피해 6 + 파기한 1장당 피해 7' },
+        { key: 'logic_bomb', name: '로직 폭탄', cost: 3, damage: 14, block: 8, desc: '피해 14, 방어도 8' },
+        { key: 'defrag', name: '조각 모음', cost: 2, damage: 0, block: 0, draw: 2, rewind: 1, desc: '카드 2장 드로우, 게이지 1칸 되감기' },
       ],
       3: [
         { key: 'overflow', name: '오버플로우', cost: 4, damage: 31, block: 0, draw: 2, desc: '피해 31, 카드 2장 드로우' },
@@ -95,29 +131,46 @@ const TS_DATA = {
         { key: 'system_down', name: '시스템 다운', cost: 5, damage: 39, block: 0, rewind: 2, desc: '피해 39, 게이지 2칸 되감기' },
         { key: 'infinite_calc', name: '무한 연산', cost: 4, damage: 30, block: 0, draw: 3, desc: '피해 30, 카드 3장 드로우' },
         { key: 'total_flush', name: '전체 방출', cost: 3, damage: 8, block: 0, discardAll: 11, desc: '피해 8 + 파기한 1장당 피해 11' },
+        { key: 'deep_calc', name: '심층 연산', cost: 5, damage: 34, block: 0, draw: 2, rewind: 1, desc: '피해 34, 카드 2장 드로우, 게이지 1칸 되감기' },
+        { key: 'firewall', name: '방화벽', cost: 2, damage: 0, block: 18, draw: 1, desc: '방어도 18, 카드 1장 드로우' },
       ],
     },
     BLACK: {
+      1: [
+        { key: 'ironwall', name: '철벽', cost: 1, damage: 0, block: 7, desc: '방어도 7' },
+        { key: 'shield_bash', name: '방패 밀치기', cost: 2, damage: 0, block: 0, blockToDamage: 1, desc: '현재 방어도만큼 피해' },
+        { key: 'counter_stance', name: '반격 자세', cost: 1, damage: 0, block: 4, counter: 5, desc: '방어도 4, 다음 피격 시 반격 5' },
+        { key: 'check_strike', name: '견제 타격', cost: 2, damage: 8, block: 4, desc: '피해 8, 방어도 4' },
+      ],
       2: [
-        { key: 'heavyarmor', name: '중장갑', cost: 2, damage: 0, block: 12, desc: '방어도 12' },
+        { key: 'heavyarmor', name: '중장갑', cost: 2, damage: 0, block: 10, desc: '방어도 10' },
         { key: 'counter_protocol', name: '반격 프로토콜', cost: 2, damage: 0, block: 5, counter: 8, desc: '방어도 5, 다음 피격 시 반격 8' },
-        { key: 'barrier', name: '옵션: 방벽 전개', cost: 3, damage: 0, block: 0, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '방벽', amount: 6, turns: 3 }, desc: '3턴간 턴 시작 시 방어도 +6' },
+        { key: 'barrier', name: '옵션: 방벽 전개', cost: 3, damage: 0, block: 0, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '방벽', amount: 5, turns: 3 }, desc: '3턴간 턴 시작 시 방어도 +5' },
         { key: 'steel_counter', name: '강철 반격', cost: 3, damage: 19, block: 8, counter: 6, desc: '피해 19, 방어도 8, 반격 6' },
+        { key: 'rampart_strike', name: '성벽 반격', cost: 3, damage: 5, block: 6, blockToDamage: 1, desc: '피해 5 + 현재 방어도만큼, 방어도 6' },
       ],
       3: [
-        { key: 'absolute_guard', name: '절대 방어', cost: 3, damage: 0, block: 20, desc: '방어도 20' },
+        { key: 'absolute_guard', name: '절대 방어', cost: 3, damage: 0, block: 17, desc: '방어도 17' },
         { key: 'threshold_collapse', name: '임계 붕괴', cost: 4, damage: 0, block: 0, breakThresholdDown: 2, desc: 'BREAK 기준값 2 감소 (최소 E4)' },
         { key: 'anchor_finish', name: '앵커 피니시', cost: 5, damage: 39, block: 10, desc: '피해 39, 방어도 10' },
-        { key: 'fortress', name: '요새화', cost: 4, damage: 0, block: 26, counter: 10, desc: '방어도 26, 반격 10' },
+        { key: 'fortress', name: '요새화', cost: 4, damage: 0, block: 22, counter: 10, desc: '방어도 22, 반격 10' },
         { key: 'crush', name: '파쇄 강타', cost: 6, damage: 47, block: 8, desc: '피해 47, 방어도 8' },
+        { key: 'absolute_reflect', name: '절대 반사', cost: 4, damage: 10, block: 12, blockToDamage: 1, desc: '피해 10 + 현재 방어도만큼, 방어도 12' },
       ],
     },
     YELLOW: {
+      1: [
+        { key: 'bloodsuck', name: '흡혈', cost: 1, damage: 6, block: 0, lifesteal: 50, desc: '피해 6, 입힌 피해의 50% 회복' },
+        { key: 'life_cycle', name: '생명 순환', cost: 1, damage: 0, block: 0, heal: 6, draw: 1, desc: '체력 6 회복, 카드 1장 드로우' },
+        { key: 'endure', name: '고통 감내', cost: 2, damage: 10, block: 0, hpCost: 3, desc: 'HP 3 소모, 피해 10' },
+        { key: 'purify', name: '정화', cost: 1, damage: 0, block: 0, heal: 4, bossWeaken: true, desc: '체력 4 회복, 다음 보스 공격 피해 -25%' },
+      ],
       2: [
         { key: 'devotion', name: '헌신', cost: 2, damage: 13, block: 0, hpCost: 4, desc: 'HP 4 소모, 피해 13' },
-        { key: 'healing_light', name: '치유의 빛', cost: 2, damage: 0, block: 0, heal: 10, desc: '체력 10 회복' },
+        { key: 'healing_light', name: '치유의 빛', cost: 2, damage: 0, block: 0, heal: 14, desc: '체력 14 회복' },
         { key: 'decay_spread', name: '옵션: 부패 확산', cost: 2, damage: 13, block: 0, effect: 'PERSISTENT_BOSS_VULNERABLE', persistentPayload: { id: 'aura-boss-vulnerable', name: '부패', amount: 15, turns: 2 }, desc: '피해 13, 2턴간 보스 받는 피해 +15%' },
         { key: 'blood_pact', name: '피의 계약', cost: 3, damage: 20, block: 0, hpCost: 5, desc: 'HP 5 소모, 피해 20' },
+        { key: 'drain_wave', name: '흡정의 파동', cost: 3, damage: 16, block: 0, lifesteal: 50, desc: '피해 16, 입힌 피해의 50% 회복' },
       ],
       3: [
         { key: 'sacrifice', name: '희생의 일격', cost: 3, damage: 24, block: 0, hpCost: 8, desc: 'HP 8 소모, 피해 24' },
@@ -125,6 +178,7 @@ const TS_DATA = {
         { key: 'doom_pact', name: '종말의 계약', cost: 5, damage: 40, block: 0, hpCost: 5, desc: 'HP 5 소모, 피해 40' },
         { key: 'life_convert', name: '생명 전환', cost: 4, damage: 31, block: 0, heal: 8, desc: '피해 31, 체력 8 회복' },
         { key: 'final_awakening', name: '최후의 각성', cost: 6, damage: 48, block: 0, hpCost: 10, desc: 'HP 10 소모, 피해 48' },
+        { key: 'great_drain', name: '대흡혈', cost: 5, damage: 36, block: 0, lifesteal: 50, desc: '피해 36, 입힌 피해의 50% 회복' },
       ],
     },
   },
@@ -132,14 +186,24 @@ const TS_DATA = {
   // 카드 강화("+") — gdd/11-card-tiers.md 11-2. key → 덮어쓸 필드
   UPGRADES: {
     strike: { damage: 8 }, defend: { block: 8 }, breakthrough: { damage: 13 },
-    focus: { draw: 1 }, gigaburst: { damage: 38 },
-    jab: { damage: 7 }, tuneup: { draw: 2 }, rewind: { rewind: 2 },
+    focus: { draw: 1 }, chain_burst: { chain: 10 }, chainstrike: { chain: 6 },
+    rapid_slash: { chain: 5 }, brace: { chainBlock: 5 }, flame_edge: { damage: 15 },
+    ignite: { damage: 7 }, double_load: { damage: 9 }, counter_rage: { damage: 11 },
+    chain_wall: { chainBlock: 6 },
+    jab: { damage: 7 }, tuneup: { draw: 2 }, rewind: { rewind: 3 },
+    datashard: { damage: 9 }, parallel_scan: { draw: 3 }, backup_circuit: { block: 9 },
+    calc_boost: { damage: 11 }, delay_loop: { block: 12 },
     memflush: { discardAll: 7 },
     chain: { damage: 9 }, overload_info: { damage: 4 },
-    guard: { block: 12 }, anchor: { damage: 10, block: 5 }, fortify: { block: 7 },
+    guard: { block: 11 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
+    ironwall: { block: 10 }, shield_bash: { damage: 5 }, counter_stance: { counter: 8 },
+    check_strike: { damage: 11 },
     reboot: { counter: 9 }, threshold: { breakThresholdDown: 2 },
-    siphon: { damage: 10 }, firstaid: { heal: 9 }, corrode: { damage: 8 },
-    regen: { heal: 4 }, resolve: { damage: 15 },
+    siphon: { damage: 10 }, firstaid: { heal: 12 }, corrode: { damage: 8 },
+    drain_wave: { damage: 20 },
+    bloodsuck: { damage: 9 }, life_cycle: { heal: 9 }, endure: { damage: 13 },
+    purify: { heal: 7 },
+    regen: { heal: 7 }, resolve: { damage: 15 },
   },
 
   // ─────────────────────────────────────────────────────────────

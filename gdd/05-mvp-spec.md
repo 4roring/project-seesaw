@@ -16,20 +16,46 @@ interface Card {
   damage: number;
   block: number;
   desc: string;
+
+  // 숫자 필드 — 여러 개를 한 장에 동시에 붙일 수 있다
+  draw?: number;                // 즉시 드로우 장수
+  rewind?: number;              // 게이지를 P 방향으로 되돌리는 칸 수
+  heal?: number;                // 즉시 회복량
+  hpCost?: number;              // HP를 코스트로 소모 (남은 HP 이상이면 사용 불가)
+  counter?: number;             // 다음 피격 1회에 돌려줄 반격 피해
+  breakThresholdDown?: number;  // 이번 전투 BREAK 기준값 감소 (최소 E4)
+  bossWeaken?: boolean;         // 다음 보스 공격 피해 -25%
+  discardAll?: number;          // 남은 손패를 전부 파기, 파기 1장당 피해 +N (블루)
+  chain?: number;               // 이번 턴에 이미 쓴 카드 1장당 피해 +N (레드)
+  chainBlock?: number;          // 이번 턴에 이미 쓴 카드 1장당 방어도 +N (레드)
+  blockToDamage?: number;       // 현재 방어도 x N 을 피해에 가산 (블랙)
+  lifesteal?: number;           // 입힌 피해의 N%를 회복 (옐로우)
+
+  // 카드 자체의 성질
+  unique?: boolean;             // 덱에 1장만 — 보상 풀에서 제외
+  exhaust?: boolean;            // 사용 후 버린 더미로 가지 않고 이번 전투에서 소멸
+
   effect: null
     | 'REDUCE_NEXT_COST'        // 다음 카드 비용 -1
     | 'DOUBLE_NEXT_ATTACK'      // 다음 공격 카드 피해 2배
     | 'PERSISTENT_DAMAGE_BOOST'
     | 'PERSISTENT_BLOCK_ON_TURN_START'
-    | 'PERSISTENT_BOSS_VULNERABLE';
+    | 'PERSISTENT_BOSS_VULNERABLE'
+    | 'PERSISTENT_HEAL_ON_TURN_START';
   persistentPayload?: { id: string; name: string; amount: number; turns: number };
 }
+
+// [불변 규칙] rewind 카드는 반드시 cost - rewind >= 1.
+//   버린 더미는 다시 섞여 들어오므로 메모리 순증(cost <= rewind) 카드는
+//   장수와 무관하게 한 턴을 무한히 늘리는 영구기관이 된다. 순증 카드를
+//   만들려면 exhaust로 1회용임을 보장해야 한다 (11-card-tiers.md 11-5).
 
 // 지속 효과 — 규칙은 06-persistent-effects.md
 interface PersistentEffect {
   id: string;
   name: string;
-  kind: 'DAMAGE_BOOST' | 'BLOCK_ON_TURN_START' | 'BOSS_VULNERABLE_AURA';
+  kind: 'DAMAGE_BOOST' | 'BLOCK_ON_TURN_START' | 'BOSS_VULNERABLE_AURA'
+      | 'HEAL_ON_TURN_START';
   amount: number;
   turnsRemaining: number;
 }
@@ -66,6 +92,7 @@ interface BattleState {
   cardsPlayedThisTurn: number;
   comboCounter: number;
   comboBonusDrawsThisTurn: number;
+  cardsDiscardedThisTurn: number;  // 패 파기로 버린 장수 — 보충 드로우에 포함
 
   drawPile: Card[];
   hand: Card[];
@@ -90,23 +117,18 @@ interface BattleState {
 ## 5-4. 보스 스펙
 
 스테이지별 적 데이터는 [10-enemy-roster.md](10-enemy-roster.md)가
-정본이며, 현재 웹 데모는 스테이지 1(초심자의 파수꾼, HP 120)만
-구현되어 있습니다. 행동 규칙은 [08-boss-skill-loop.md](08-boss-skill-loop.md)를
-따릅니다.
+정본이며, 스테이지 1~10의 적 10종이 모두 구현되어 있습니다. 행동 규칙은
+[08-boss-skill-loop.md](08-boss-skill-loop.md)를 따릅니다.
 
-## 5-5. 확장 시 선행돼야 할 스키마 (MVP 범위 밖)
+## 5-5. 남아 있는 스키마 한계
 
-블루/블랙/옐로우 카드([11-card-tiers.md](11-card-tiers.md) 11-4~11-6)를
-구현하려면 아래가 먼저 필요합니다.
+4색 카드가 요구하던 스키마 확장(임계점 축소, 게이지 되감기, HP 대체
+코스트, 확정 디버프, 피격 반격)은 모두 5-1에 반영돼 구현되었습니다.
+아직 남아 있는 한계는 하나입니다.
 
-- `breakThreshold: number` — 블랙의 임계점 축소 (기본값 6)
-- 게이지 되감기 카드 효과 (`REWIND_GAUGE`) — 블루
-- HP를 코스트처럼 소모하는 대체 코스트 처리 — 옐로우
-  (현재 `Card.cost`는 게이지 전진량 단일 의미로만 쓰임)
-- 보스에게 거는 확정 디버프, 피격 반격 트리거
-- 보스가 플레이어에게 거는 약화/취약은 현재 단일 불리언(정확히 1턴/1회
-  소모)입니다. 여러 턴 지속되는 디버프가 필요해지면 `activeEffects`와
-  같은 배열 구조로 통합하는 것을 권장합니다.
+- 보스가 플레이어에게 거는 약화/취약은 단일 불리언(정확히 1턴 / 1회
+  소모)입니다. 여러 턴 지속되는 보스발 디버프가 필요해지면, 플레이어
+  지속 효과가 쓰는 `activeEffects` 배열 구조로 통합하는 것을 권장합니다.
 
 관련 문서: [11-card-tiers.md](11-card-tiers.md) (카드 목록),
 [10-enemy-roster.md](10-enemy-roster.md) (적 데이터),
