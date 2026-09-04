@@ -50,3 +50,5 @@
 | [003-hap-exchange-memory.md](003-hap-exchange-memory.md) | 🌱 씨앗 | 역량에 따른 가변 기세 폭, 오버 파훼, 적의 마무리 선택 |
 | [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | 🌱 씨앗 | 누적 수련 해금 + 숨겨진 조건(깨달음) 카드 |
 | [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | 🌱 씨앗 | 특정 순서로 터지는 강제 발동 절초 (비용도 함께 지불) |
+| [006-color-factions.md](006-color-factions.md) | 🌱 씨앗 | 4색 → 오방색(정색5) + 간색. 당가=녹 · 마교=자 · 무당=흑 확정 |
+| [007-ip-safety.md](007-ip-safety.md) | 🌱 씨앗 | 저작권·상표 3등급 분류. 디지몬 고유 명칭(테이머/옵션/메모리) 제거 대상 |
