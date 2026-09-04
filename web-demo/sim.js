@@ -16,10 +16,11 @@ window.TS_Sim = (() => {
     if (c.blockToDamage) v += g.playerBlock * c.blockToDamage;
     if (c.discardAll) v += c.discardAll * (g.hand.length - 1);
     // 방어도/회복을 피해의 0.6배로 보던 초기 가중치는 방어형 컬러를 구조적으로
-    // 과소평가했다. 실측상 블랙(피해 절반, 도달 9.8)이 증명하듯 경감은 피해와
+    // 과소평가했다. 실측상 백(피해 절반, 도달 9.8)이 증명하듯 경감은 피해와
     // 거의 동등한 가치라, 1.0으로 맞춰야 컬러 비교가 공정해진다.
     v += (c.block || 0) * 1.0 + (c.heal || 0) * 1.0 + (c.draw || 0) * 4 + (c.counter || 0) * 0.8;
     if (c.lifesteal) v += (c.damage || 0) * c.lifesteal / 100;
+    if (c.evade) v += c.evade * 7; // 일격 하나를 통째로 넘기는 값어치
     if (c.effect) v += 4;
     if (c.rewind) v += c.rewind * 3;
     if (c.bossWeaken) v += 3;
@@ -43,16 +44,22 @@ window.TS_Sim = (() => {
         E.playCard(g, playable[0].uid);
         continue;
       }
-      // 2) 없으면 턴을 끝내며 가장 크게 때리거나, 별로면 메모리를 카드로 환전
-      let best = null, bv = -1;
+      // 2) 합을 끝내야 한다. 무엇으로 끝내느냐가 다음 합을 정한다.
+      //    - 파훼(적max 도달)에 닿는 초식이 있으면 그게 거의 항상 최선이다:
+      //      적의 페이즈가 통째로 지워지고 다음 합에 사혈 노출까지 붙는다.
+      //    - 아니면 가장 크게 때리는 초식. 그것도 시원찮으면 기세를 카드로 환전.
+      let best = null, bv = -1, bestBreaks = false;
       g.hand.filter((c) => usable(g, c)).forEach((c) => {
-        const v = (c.damage || 0)
+        const land = g.gauge + Math.max(0, cost(g, c) - g.pendingCostReduction * 0) - (c.rewind || 0);
+        const breaks = land >= g.breakThreshold;
+        let v = (c.damage || 0)
           + (c.chain ? c.chain * g.cardsPlayedThisTurn : 0)
           + (c.discardAll ? c.discardAll * (g.hand.length - 1) : 0)
           + (c.blockToDamage ? g.playerBlock * c.blockToDamage : 0);
-        if (v > bv) { bv = v; best = c; }
+        if (breaks) v += 40; // 페이즈 한 번을 통째로 지우는 값어치
+        if (v > bv) { bv = v; best = c; bestBreaks = breaks; }
       });
-      if (best && bv >= 8) { stat.plays++; E.playCard(g, best.uid); }
+      if (best && (bestBreaks || bv >= 8)) { stat.plays++; E.playCard(g, best.uid); }
       else { stat.draws++; E.drawAction(g); }
     }
   }

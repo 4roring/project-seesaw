@@ -22,14 +22,15 @@ interface Card {
   rewind?: number;              // 게이지를 P 방향으로 되돌리는 칸 수
   heal?: number;                // 즉시 회복량
   hpCost?: number;              // HP를 코스트로 소모 (남은 HP 이상이면 사용 불가)
-  counter?: number;             // 다음 피격 1회에 돌려줄 반격 피해
-  breakThresholdDown?: number;  // 이번 전투 BREAK 기준값 감소 (최소 E4)
+  counter?: number;             // 다음 피격 1회에 돌려줄 반탄 피해 (백)
+  evade?: number;               // 다음 N회의 피격을 통째로 무효화 (흑)
+  breakThresholdDown?: number;  // 이번 전투 파훼 임계점 감소 (최소 E4)
   bossWeaken?: boolean;         // 다음 보스 공격 피해 -25%
-  discardAll?: number;          // 남은 손패를 전부 파기, 파기 1장당 피해 +N (블루)
-  chain?: number;               // 이번 턴에 이미 쓴 카드 1장당 피해 +N (레드)
-  chainBlock?: number;          // 이번 턴에 이미 쓴 카드 1장당 방어도 +N (레드)
-  blockToDamage?: number;       // 현재 방어도 x N 을 피해에 가산 (블랙)
-  lifesteal?: number;           // 입힌 피해의 N%를 회복 (옐로우)
+  discardAll?: number;          // 남은 손패를 전부 파기, 파기 1장당 피해 +N (흑)
+  chain?: number;               // 이번 합에 이미 쓴 초식 1장당 피해 +N (적)
+  chainBlock?: number;          // 이번 합에 이미 쓴 초식 1장당 방어도 +N (적)
+  blockToDamage?: number;       // 현재 방어도 x N 을 피해에 가산 (백)
+  lifesteal?: number;           // 입힌 피해의 N%를 회복 (자)
 
   // 카드 자체의 성질
   unique?: boolean;             // 덱에 1장만 — 보상 풀에서 제외
@@ -46,7 +47,7 @@ interface Card {
 }
 
 // [불변 규칙] rewind 카드는 반드시 cost - rewind >= 1.
-//   버린 더미는 다시 섞여 들어오므로 메모리 순증(cost <= rewind) 카드는
+//   버린 더미는 다시 섞여 들어오므로 기세 순증(cost <= rewind) 카드는
 //   장수와 무관하게 한 턴을 무한히 늘리는 영구기관이 된다. 순증 카드를
 //   만들려면 exhaust로 1회용임을 보장해야 한다 (11-card-tiers.md 11-5).
 
@@ -78,7 +79,7 @@ interface BattleState {
 
   // 정확히 1턴만 유효한 상태
   playerWeakenActive: boolean;      // 내 카드 피해 -25%
-  bossVulnerableActive: boolean;    // 보스가 받는 피해 +50% (BREAK 유래)
+  bossVulnerableActive: boolean;    // 보스가 받는 피해 +50% (파훼 유래)
   // 다음 피격 1회에 소모되는 상태
   playerVulnerableActive: boolean;  // 보스 공격 피해 +50%
 
@@ -93,6 +94,12 @@ interface BattleState {
   comboCounter: number;
   comboBonusDrawsThisTurn: number;
   cardsDiscardedThisTurn: number;  // 패 파기로 버린 장수 — 보충 드로우에 포함
+  evadeCharges: number;            // 남은 흘리기 횟수 (흑)
+
+  // 적의 개성 두 축 — 전역 상수가 아니라 적 스탯 (gdd/02 2-2, gdd/08 8-4-1)
+  baseBreakThreshold: number;      // 적max 원값. 임계점 축소의 하한 계산용
+  breakThreshold: number;          // 현재 적max
+  closerStyle: 'DOMINANT' | 'CRAFTY';  // 패도 | 노회
 
   drawPile: Card[];
   hand: Card[];
@@ -104,15 +111,15 @@ interface BattleState {
 ## 5-2. 승리/패배 조건
 
 - **승리:** `bossHp`가 `0` 이하가 되는 시점 (턴 진행 중 언제든 즉시 판정).
-- **패배:** `playerHp`가 `0` 이하가 되는 시점 (보스 기술 루프 도중이면
+- **패배:** `playerHp`가 `0` 이하가 되는 시점 (적 초식 루프 도중이면
   그 즉시 루프를 중단).
-- BREAK는 즉사 효과가 아니라 템포 수단이며, 실제 승패는 `damage`/`block`
+- 파훼는 즉사 효과가 아니라 템포 수단이며, 실제 승패는 `damage`/`block`
   누적으로 결정됩니다.
 
 ## 5-3. 카드 세트
 
 시작 덱과 티어별 보상 풀은 [11-card-tiers.md](11-card-tiers.md)가
-정본입니다. 현재 웹 데모는 **레드** 카드만 구현되어 있습니다.
+정본입니다. 4문파 카드가 모두 구현되어 있습니다.
 
 ## 5-4. 보스 스펙
 

@@ -12,7 +12,7 @@
     <!-- ── 덱 선택 ───────────────────────────────────────────── -->
     <section class="screen" id="screen-select">
       <h1 class="title">Timeline Seesaw</h1>
-      <p class="subtitle">공유 메모리 게이지를 밀고 당기는 덱빌딩 로그라이크 · 스테이지 1~10</p>
+      <p class="subtitle">하나의 기세를 밀고 당기는 무림 덱빌딩 로그라이크 · 스테이지 1~10</p>
       <div class="deck-grid" id="deck-grid"></div>
     </section>
 
@@ -24,7 +24,7 @@
           <span class="stage-name" id="stage-name"></span>
         </div>
         <div class="header-right">
-          <span class="turn-info">턴 <span id="turn-count">1</span></span>
+          <span class="turn-info"><span id="turn-count">1</span>합</span>
           <button id="restart-btn" class="ghost-btn">런 포기</button>
         </div>
       </header>
@@ -56,7 +56,7 @@
         </div>
       </div>
 
-      <!-- 공유 메모리 게이지 -->
+      <!-- 공유 기세 -->
       <section class="panel gauge-panel">
         <div class="gauge-track" id="gauge-track">
           <div class="gauge-cells" id="gauge-cells"></div>
@@ -67,12 +67,12 @@
         <div class="boss-skill-legend" id="boss-skill-legend"></div>
       </section>
 
-      <section class="play-zone" id="play-zone">카드를 여기로 드래그해 사용 (클릭도 가능)</section>
+      <section class="play-zone" id="play-zone">초식을 여기로 드래그해 사용 (클릭도 가능)</section>
 
       <div class="combo-row">
-        <span class="combo-label">콤보</span>
+        <span class="combo-label">연환</span>
         <div class="combo-dots" id="combo-dots"></div>
-        <span class="combo-hint">3장 연속 사용 시 카드 1장 추가 드로우</span>
+        <span class="combo-hint">초식 3장을 이으면 카드 1장 추가 드로우</span>
       </div>
 
       <section class="panel">
@@ -81,7 +81,7 @@
 
       <div class="controls-row">
         <div class="pile-counts" id="pile-counts"></div>
-        <button id="draw-btn">드로우 (메모리 2 · 카드 1장)</button>
+        <button id="draw-btn">숨 고르기 (기세 2 · 카드 1장)</button>
       </div>
 
       <section class="panel log-panel" id="log-panel"></section>

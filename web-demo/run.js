@@ -139,7 +139,7 @@ const TS_Run = (() => {
     if (patch.draw) parts.push(`드로우 ${patch.draw}`);
     if (patch.rewind) parts.push(`되감기 ${patch.rewind}`);
     if (patch.counter) parts.push(`반격 ${patch.counter}`);
-    if (patch.breakThresholdDown) parts.push(`BREAK 기준값 -${patch.breakThresholdDown}`);
+    if (patch.breakThresholdDown) parts.push(`파훼 임계점 -${patch.breakThresholdDown}`);
     if (patch.chain) parts.push(`연계 피해 ${patch.chain}`);
     if (patch.chainBlock) parts.push(`연계 방어도 ${patch.chainBlock}`);
     if (patch.lifesteal) parts.push(`흡혈 ${patch.lifesteal}%`);

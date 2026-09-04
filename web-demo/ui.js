@@ -44,7 +44,7 @@ const TS_UI = (() => {
       div.className = `deck-card ${key}`;
       div.innerHTML = `
         <div class="deck-icon">${info.icon}</div>
-        <div class="deck-name">${info.name}</div>
+        <div class="deck-name">${info.sect} <span class="deck-color">${info.name}</span></div>
         <div class="deck-desc">${info.desc}</div>
         <div class="deck-list">${list}</div>`;
       div.addEventListener('click', () => {
@@ -57,28 +57,37 @@ const TS_UI = (() => {
   }
 
   // ── 전투 ────────────────────────────────────────────────────
-  function buildGaugeTrack() {
+  // 적 쪽 폭(적max)은 적마다 다르므로 전투가 바뀔 때마다 축을 다시 그린다
+  // (gdd/02 2-2). 아 쪽은 항상 6칸.
+  let gaugeMax = null;
+
+  function buildGaugeTrack(maxE) {
+    gaugeMax = maxE;
     els['gauge-cells'].innerHTML = '';
-    for (let v = D.GAUGE_MIN; v <= D.GAUGE_MAX; v++) {
+    for (let v = D.GAUGE_MIN; v <= maxE; v++) {
       const cell = document.createElement('div');
-      cell.className = 'gauge-cell ' + zoneClassFor(v);
-      cell.textContent = v === 0 ? '0' : v < 0 ? `P${-v}` : `E${v}`;
+      cell.className = 'gauge-cell ' + zoneClassFor(v, maxE);
+      cell.textContent = v === 0 ? '0' : v < 0 ? `아${-v}` : `적${v}`;
       els['gauge-cells'].appendChild(cell);
     }
   }
 
-  function zoneClassFor(v) {
+  // 구간 색은 적max에 대한 상대 위치로 정한다 — 절대값으로 두면 적max가
+  // 4인 적에서 "위험" 구간이 아예 안 나온다.
+  function zoneClassFor(v, maxE) {
     if (v < 0) return 'p';
     if (v === 0) return 'neutral';
-    if (v <= 2) return 'e-safe';
-    if (v <= 4) return 'e-engage';
-    if (v <= 5) return 'e-danger';
-    return 'e-break';
+    if (v >= maxE) return 'e-break';
+    const ratio = v / maxE;
+    if (ratio <= 0.34) return 'e-safe';
+    if (ratio <= 0.67) return 'e-engage';
+    return 'e-danger';
   }
 
   function gaugePercent(gauge) {
-    const idx = gauge - D.GAUGE_MIN;
-    const total = D.GAUGE_MAX - D.GAUGE_MIN + 1;
+    const max = gaugeMax != null ? gaugeMax : D.GAUGE_MAX;
+    const idx = Math.min(gauge, max) - D.GAUGE_MIN;
+    const total = max - D.GAUGE_MIN + 1;
     return ((idx + 0.5) / total) * 100;
   }
 
@@ -86,12 +95,15 @@ const TS_UI = (() => {
     const g = run.game;
     const color = D.COLORS[run.color];
 
+    if (gaugeMax !== g.breakThreshold) buildGaugeTrack(g.breakThreshold);
+
     els['stage-badge'].textContent = `STAGE ${run.stage}`;
-    els['stage-name'].textContent = g.enemyName;
+    els['stage-name'].textContent = g.enemyRealm
+      ? `${g.enemyName} · ${g.enemyRealm}` : g.enemyName;
     els['turn-count'].textContent = g.turn;
 
     els['player-avatar'].textContent = color.icon;
-    els['player-name'].textContent = `${color.name} 덱`;
+    els['player-name'].textContent = `${color.sect} · ${color.name}`;
     els['enemy-avatar'].textContent = g.enemyIcon;
     els['enemy-name'].textContent = g.enemyName;
 
@@ -105,25 +117,26 @@ const TS_UI = (() => {
     addBadge(els['boss-badges'], 'block', `방어도 ${g.bossBlock}`, g.bossBlock > 0);
     addBadge(els['boss-badges'], 'power', `공격력 +${g.bossScalingPower}`, g.bossScalingPower > 0);
     addBadge(els['boss-badges'], 'stun', '기절', g.isBossStunned);
-    addBadge(els['boss-badges'], 'vulnerable', '취약(BREAK)', g.bossVulnerableActive);
-    addBadge(els['boss-badges'], 'weaken', '약화(다음 공격 -25%)', g.bossWeakenActive);
+    addBadge(els['boss-badges'], 'vulnerable', '사혈 노출(파훼)', g.bossVulnerableActive);
+    addBadge(els['boss-badges'], 'weaken', '부식(다음 공격 -25%)', g.bossWeakenActive);
     g.activeEffects.filter((e) => e.kind === 'BOSS_VULNERABLE_AURA')
-      .forEach((e) => addBadge(els['boss-badges'], 'vulnerable', `${e.name} +${e.amount}% (${e.turnsRemaining}턴)`, true));
+      .forEach((e) => addBadge(els['boss-badges'], 'vulnerable', `${e.name} +${e.amount}% (${e.turnsRemaining}합)`, true));
 
     els['player-badges'].innerHTML = '';
     addBadge(els['player-badges'], 'block', `방어도 ${g.playerBlock}`, g.playerBlock > 0);
-    addBadge(els['player-badges'], 'weaken', '약화(-25%)', g.playerWeakenActive);
-    addBadge(els['player-badges'], 'vulnerable', '취약(다음 피격 +50%)', g.playerVulnerableActive);
-    addBadge(els['player-badges'], 'power', `반격 ${g.counterDamage}`, g.counterDamage > 0);
-    addBadge(els['player-badges'], 'power', `다음 카드 비용 -${g.pendingCostReduction}`, g.pendingCostReduction > 0);
+    addBadge(els['player-badges'], 'weaken', '내상(-25%)', g.playerWeakenActive);
+    addBadge(els['player-badges'], 'vulnerable', '사혈 노출(다음 피격 +50%)', g.playerVulnerableActive);
+    addBadge(els['player-badges'], 'power', `반탄 ${g.counterDamage}`, g.counterDamage > 0);
+    addBadge(els['player-badges'], 'block', `흘리기 ${g.evadeCharges}회`, g.evadeCharges > 0);
+    addBadge(els['player-badges'], 'power', `다음 초식의 틈 -${g.pendingCostReduction}`, g.pendingCostReduction > 0);
     addBadge(els['player-badges'], 'power', `다음 공격 ${g.pendingDamageMultiplier}배`, g.pendingDamageMultiplier > 1);
-    addBadge(els['player-badges'], 'stun', `BREAK 기준 E${g.breakThreshold}`, g.breakThreshold !== D.BREAK_THRESHOLD);
+    addBadge(els['player-badges'], 'stun', `파훼 임계점 적${g.breakThreshold}`, g.breakThreshold !== g.baseBreakThreshold);
     g.activeEffects.filter((e) => e.kind === 'DAMAGE_BOOST')
-      .forEach((e) => addBadge(els['player-badges'], 'power', `${e.name} 피해+${e.amount} (${e.turnsRemaining}턴)`, true));
+      .forEach((e) => addBadge(els['player-badges'], 'power', `${e.name} 피해+${e.amount} (${e.turnsRemaining}합)`, true));
     g.activeEffects.filter((e) => e.kind === 'BLOCK_ON_TURN_START')
-      .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 방어+${e.amount} (${e.turnsRemaining}턴)`, true));
+      .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 방어+${e.amount} (${e.turnsRemaining}합)`, true));
     g.activeEffects.filter((e) => e.kind === 'HEAL_ON_TURN_START')
-      .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 회복+${e.amount} (${e.turnsRemaining}턴)`, true));
+      .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 회복+${e.amount} (${e.turnsRemaining}합)`, true));
 
     els['gauge-marker'].style.left = gaugePercent(g.gauge) + '%';
 
@@ -159,12 +172,24 @@ const TS_UI = (() => {
 
   function renderSkillLegend(g) {
     els['boss-skill-legend'].innerHTML = '';
+
+    // 적의 개성 두 축을 먼저 보여준다 — 플레이어의 전술을 바꾸는 정보라
+    // 숨기면 스탯이 있으나 마나가 된다 (gdd/10 10-1)
+    const style = g.closerStyle === 'CRAFTY'
+      ? { name: '노회', hint: '마무리로 가장 싼 초식 — 얕게 넘겨도 크게 안 돌아온다' }
+      : { name: '패도', hint: '마무리로 가장 비싼 초식 — 크게 맞고 크게 돌려받는다' };
+    const head = document.createElement('div');
+    head.className = 'boss-style-row';
+    head.innerHTML = `<b>파훼 임계점 적${g.breakThreshold}</b> · <b>${style.name}</b>`
+      + `<span class="boss-style-hint">${style.hint}</span>`;
+    els['boss-skill-legend'].appendChild(head);
+
     g.enemySkills.forEach((s) => {
       const cd = g.bossCooldowns[s.key] || 0;
       const row = document.createElement('div');
       row.className = 'boss-skill-row' + (cd > 0 ? ' locked' : '');
-      const cdText = cd > 0 ? ` · 재사용까지 ${cd}턴` : (s.cooldown > 0 ? ` · 쿨다운 ${s.cooldown}턴` : '');
-      row.textContent = `${s.name} — 비용 ${s.cost}${cdText}`;
+      const cdText = cd > 0 ? ` · 재사용까지 ${cd}합` : (s.cooldown > 0 ? ` · 쿨다운 ${s.cooldown}합` : '');
+      row.textContent = `${s.name} — 틈 ${s.cost}${cdText}`;
       els['boss-skill-legend'].appendChild(row);
     });
   }
@@ -263,7 +288,7 @@ const TS_UI = (() => {
     setTimeout(() => div.remove(), 1100);
   }
 
-  // 메모리가 게이지 위로 떨어지는 연출
+  // 기세가 게이지 위로 떨어지는 연출
   function dropMemory(toGauge) {
     const pct = gaugePercent(toGauge);
     for (let i = 0; i < 4; i++) {
@@ -279,7 +304,7 @@ const TS_UI = (() => {
   function breakFlash() {
     const div = document.createElement('div');
     div.className = 'break-flash';
-    div.textContent = 'BREAK!';
+    div.textContent = '파훼!';
     els['arena'].appendChild(div);
     setTimeout(() => div.remove(), 800);
   }
@@ -297,7 +322,7 @@ const TS_UI = (() => {
       const hpTag = opt.hpCost ? `HP -${opt.hpCost} · ` : '';
       div.innerHTML = `
         <div class="rc-name">${opt.name}</div>
-        <div class="rc-cost">비용 ${opt.cost}</div>
+        <div class="rc-cost">틈 ${opt.cost}</div>
         <div class="rc-desc">${hpTag}${opt.desc}</div>`;
       div.addEventListener('click', () => { TS_Run.takeCard(opt); resetBattleFx(); render(); });
       els['reward-grid'].appendChild(div);
@@ -350,8 +375,8 @@ const TS_UI = (() => {
       if (uid) doPlayCard(uid);
     });
 
-    // 드로우 액션 — 비용 2짜리 카드와 동일하게 처리되며, 게이지가 0을
-    // 넘으면 그대로 턴이 끝난다 (gdd/07 7-1)
+    // 숨 고르기 — 틈 2짜리 초식과 동일하게 처리되며, 기세가 0을
+    // 넘으면 그대로 선이 넘어간다 (gdd/07 7-1)
     els['draw-btn'].addEventListener('click', () => {
       const run = TS_Run.get();
       if (run.phase !== 'BATTLE') return;
@@ -368,7 +393,6 @@ const TS_UI = (() => {
 
   function init() {
     cacheEls();
-    buildGaugeTrack();
     wireStaticEvents();
     TS_Run.newRun();
     render();

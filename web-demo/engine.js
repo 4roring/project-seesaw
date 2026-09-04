@@ -1,4 +1,4 @@
-// 전투 엔진 — gdd/01~08 문서의 규칙을 구현
+// 전투 엔진 — gdd/01~08, 12 문서의 규칙을 구현
 // 문서에 수치가 없는 부분은 web-demo/README.md에 "구현 가정"으로 정리.
 
 const TS_Engine = (() => {
@@ -45,15 +45,21 @@ const TS_Engine = (() => {
       isBossStunned: false,
       bossCooldowns: Object.fromEntries(enemy.skills.map((s) => [s.key, 0])),
 
-      breakThreshold: D.BREAK_THRESHOLD, // 블랙의 임계점 축소로 낮아질 수 있음
+      // 파훼 임계점은 전역 상수가 아니라 적의 스탯이다 (gdd/02 2-2).
+      // base는 임계점 축소 카드의 하한을 상대값으로 계산하기 위해 남긴다.
+      baseBreakThreshold: enemy.breakThreshold,
+      breakThreshold: enemy.breakThreshold,
+      closerStyle: enemy.closerStyle || 'DOMINANT', // 패도 | 노회 (gdd/08 8-4-1)
+      enemyRealm: enemy.realm || '',
 
       // 정확히 1턴만 유효한 상태
       playerWeakenActive: false,
       bossVulnerableActive: false,
       // 다음 피격 1회에 소모되는 상태
       playerVulnerableActive: false,
-      bossWeakenActive: false, // 보스의 다음 공격 피해 -25% (옐로우 '부식')
-      counterDamage: 0,        // 다음 피격 시 보스에게 돌려줄 반격 피해 (블랙 '재부팅')
+      bossWeakenActive: false, // 적의 다음 공격 피해 -25% (자 '부식장')
+      counterDamage: 0,        // 다음 피격 시 돌려줄 반탄 피해 (백 '반탄강기')
+      evadeCharges: 0,         // 남은 흘리기 횟수 — 피격 1회를 통째로 무효화 (흑)
 
       // "다음 카드 한 장" 보너스 — 소비될 때까지 턴을 넘겨도 유지 (gdd 06 문서)
       pendingCostReduction: 0,
@@ -110,7 +116,7 @@ const TS_Engine = (() => {
     game.cardsDiscardedThisTurn = 0;
     tickActiveEffects(game);
     drawCards(game, refillCount);
-    pushLog(game, `--- 턴 ${game.turn} 시작 (게이지 ${gaugeLabel(game.gauge)}) ---`);
+    pushLog(game, `--- ${game.turn}합 시작 (기세 ${gaugeLabel(game.gauge)}) ---`);
   }
 
   function addOrRefreshEffect(game, { id, name, kind, amount, turns }) {
@@ -155,7 +161,7 @@ const TS_Engine = (() => {
 
   function gaugeLabel(g) {
     if (g === 0) return '중립(0)';
-    return g < 0 ? `P${-g}` : `E${g}`;
+    return g < 0 ? `아${-g}` : `적${g}`;
   }
 
   function checkWinLose(game) {
@@ -175,7 +181,7 @@ const TS_Engine = (() => {
 
   function applyDamageToBoss(game, rawDamage) {
     let dmg = rawDamage;
-    // BREAK 취약(+50%)과 아우라(+N%)는 가산 후 한 번에 곱연산 (gdd/06 6-3)
+    // 파훼 사혈 노출(+50%)과 아우라(+N%)는 가산 후 한 번에 곱연산 (gdd/06 6-3)
     const bonusPct = (game.bossVulnerableActive ? 50 : 0) + sumEffectAmount(game, 'BOSS_VULNERABLE_AURA');
     if (bonusPct > 0) dmg = Math.round(dmg * (1 + bonusPct / 100));
     const absorbed = Math.min(game.bossBlock, dmg);
@@ -185,9 +191,17 @@ const TS_Engine = (() => {
   }
 
   function applyDamageToPlayer(game, rawDamage) {
+    // 흘리기 (흑/무당) — 사량발천근. 방어도처럼 깎는 게 아니라 그 일격을
+    // 통째로 넘긴다. 큰 일격일수록 이득이라 방어도(백)와 성격이 다르다.
+    if (game.evadeCharges > 0) {
+      game.evadeCharges -= 1;
+      pushLog(game, `흘리기 — 일격을 넘겼습니다. (남은 횟수 ${game.evadeCharges})`);
+      pushFx(game, 'evade', {});
+      return 0;
+    }
     let dmg = rawDamage;
     if (game.bossWeakenActive) {
-      dmg = Math.round(dmg * 0.75); // 옐로우 '부식'
+      dmg = Math.round(dmg * 0.75); // 자 '부식장'
       game.bossWeakenActive = false;
     }
     if (game.playerVulnerableActive) {
@@ -198,29 +212,33 @@ const TS_Engine = (() => {
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
 
-    // 반격 (블랙 '재부팅') — 피격 시 1회 소모
+    // 반격 (백 '반탄강기') — 피격 시 1회 소모
     if (game.counterDamage > 0) {
       const counter = game.counterDamage;
       game.counterDamage = 0;
       applyDamageToBoss(game, counter);
-      pushLog(game, `반격! ${counter} 피해를 돌려줍니다.`);
-      pushFx(game, 'playerAttack', { amount: counter, label: '반격' });
+      pushLog(game, `반탄! ${counter} 피해를 돌려줍니다.`);
+      pushFx(game, 'playerAttack', { amount: counter, label: '반탄' });
     }
     return dmg;
   }
 
   // ── 보스 기술 선택 (gdd/08 8-4) ────────────────────────────────
-  // 같은 기술을 연속으로 쓸수록 비용이 오른다 (8-4-1)
+  // 같은 기술을 연속으로 쓸수록 비용이 오른다 (8-4-2)
   function effectiveSkillCost(skill, streak) {
     const streakBonus = streak.lastKey === skill.key ? streak.count : 0;
     return Math.max(1, skill.cost + streakBonus);
   }
 
-  // 오프너: 예산(현재 게이지) 안에 드는 기술 중 우선순위 최고. 이 분기는
+  // 오프너: 예산(현재 기세) 안에 드는 초식 중 우선순위 최고. 이 분기는
   //   gauge - cost >= 0 이라 페이즈를 끝내지 못한다.
-  // 클로저: 예산 안에 드는 게 없을 때 — 가장 "비싼" 기술로 크게 밀어낸다.
-  //   페이즈를 끝내는 것은 항상 이 분기라, 여기서 무엇을 고르냐가 플레이어에게
-  //   돌아가는 메모리 양을 결정한다.
+  // 클로저: 예산 안에 드는 게 없을 때. 페이즈를 끝내는 것은 항상 이 분기라,
+  //   여기서 무엇을 고르냐가 플레이어에게 돌아오는 기세를 결정한다.
+  //   성격에 따라 갈린다 (gdd/08 8-4-1):
+  //     패도(DOMINANT) — 가장 비싼 것. 크게 때리고 크게 돌려준다
+  //     노회(CRAFTY)  — 예산을 넘기는 것 중 가장 싼 것. 덜 때리고 덜 돌려준다
+  //   노회는 최소 반환 보장(8-4-3)이 있어야만 성립한다. 없으면 착지가 아1로
+  //   고정돼 덱 빌드업 자체가 무너졌던 초기 구현이 그대로 재현된다.
   function pickBossSkill(game, cooldowns, streak, gauge) {
     const ready = game.enemySkills.filter((s) => (cooldowns[s.key] || 0) <= 0);
     const priced = ready.map((s) => ({ skill: s, cost: effectiveSkillCost(s, streak) }));
@@ -230,6 +248,9 @@ const TS_Engine = (() => {
     if (affordable.length > 0) {
       affordable.sort((a, b) => b.skill.priority - a.skill.priority);
       chosen = affordable[0];
+    } else if (game.closerStyle === 'CRAFTY') {
+      priced.sort((a, b) => a.cost - b.cost || b.skill.priority - a.skill.priority);
+      chosen = priced[0];
     } else {
       priced.sort((a, b) => b.cost - a.cost || b.skill.priority - a.skill.priority);
       chosen = priced[0];
@@ -241,9 +262,9 @@ const TS_Engine = (() => {
     return chosen;
   }
 
-  // 최소 반환 보장(P3) + 범위 하한 (gdd/08 8-4-2)
+  // 최소 반환 보장(아3) + 범위 하한 (gdd/08 8-4-3)
   function clampReturnedGauge(finalGauge) {
-    return Math.max(Math.min(finalGauge, -D.MIN_MEMORY_RETURN), D.GAUGE_MIN);
+    return Math.max(Math.min(finalGauge, -D.MIN_MOMENTUM_RETURN), D.GAUGE_MIN);
   }
 
   function tickBossCooldowns(game) {
@@ -256,7 +277,7 @@ const TS_Engine = (() => {
     if (skill.kind === 'BUFF') {
       game.bossScalingPower += skill.powerGain;
       game.bossBlock += skill.blockGain;
-      pushLog(game, `[${skill.name}](비용 ${cost}) — 공격력 +${skill.powerGain}, 방어도 +${skill.blockGain}.`);
+      pushLog(game, `[${skill.name}](틈 ${cost}) — 공격력 +${skill.powerGain}, 방어도 +${skill.blockGain}.`);
       pushFx(game, 'enemyBuff', { name: skill.name, cost });
       return;
     }
@@ -264,12 +285,12 @@ const TS_Engine = (() => {
     let extra = '';
     if (skill.kind === 'ATTACK_WEAKEN') {
       game.playerWeakenActive = true;
-      extra = ' 약화 부여(다음 내 턴 카드 피해 -25%).';
+      extra = ' 내상 부여(다음 내 합의 초식 피해 -25%).';
     } else if (skill.kind === 'ATTACK_VULNERABLE') {
       game.playerVulnerableActive = true;
-      extra = ' 취약 부여(다음 피격 +50%).';
+      extra = ' 사혈 노출(다음 피격 +50%).';
     }
-    pushLog(game, `[${skill.name}](비용 ${cost}) — ${dmg} 피해.${extra}`);
+    pushLog(game, `[${skill.name}](틈 ${cost}) — ${dmg} 피해.${extra}`);
     pushFx(game, 'enemyAttack', { name: skill.name, amount: dmg, cost });
   }
 
@@ -304,9 +325,9 @@ const TS_Engine = (() => {
       gauge -= cost;
       if (skill.kind === 'BUFF') {
         scaling += skill.powerGain;
-        steps.push(`${skill.name}(비용${cost}, 버프)`);
+        steps.push(`${skill.name}(틈${cost}, 운기)`);
       } else {
-        steps.push(`${skill.name}(비용${cost}, ${skill.damage + scaling}dmg)`);
+        steps.push(`${skill.name}(틈${cost}, ${skill.damage + scaling}dmg)`);
       }
       if (skill.cooldown > 0) cooldowns[skill.key] = skill.cooldown;
     }
@@ -316,19 +337,19 @@ const TS_Engine = (() => {
 
   function previewIntent(game) {
     if (game.gauge <= 0) {
-      return { text: '안전 — 아직 턴이 종료되지 않습니다.', tone: 'safe' };
+      return { text: '안전 — 아직 선(先)이 넘어가지 않습니다.', tone: 'safe' };
     }
-    const n = Math.min(game.gauge, D.GAUGE_MAX);
+    const n = Math.min(game.gauge, game.breakThreshold);
     if (game.isBossStunned) {
-      return { text: `E${n} 도달 — 적이 기절 상태라 행동하지 못합니다.`, tone: 'stunned' };
+      return { text: `적${n} 도달 — 적이 무너져 행동하지 못합니다.`, tone: 'stunned' };
     }
     if (n >= game.breakThreshold) {
       const auraPct = sumEffectAmount(game, 'BOSS_VULNERABLE_AURA');
-      return { text: `BREAK! 적 행동 취소 + 기절 + 다음 턴 취약(+${50 + auraPct}% 피해)`, tone: 'break' };
+      return { text: `파훼! 적 행동 취소 + 무너짐 + 다음 합 사혈 노출(+${50 + auraPct}% 피해)`, tone: 'break' };
     }
     const sim = simulateBossPhase(game, n);
     const tone = n <= 2 ? 'charge' : n <= 4 ? 'engage' : 'danger';
-    return { text: `적 반격 예상: ${sim.steps.join(' → ')} → ${gaugeLabel(sim.finalGauge)}에서 내 턴`, tone };
+    return { text: `적 반격 예상: ${sim.steps.join(' → ')} → ${gaugeLabel(sim.finalGauge)}에서 내 합`, tone };
   }
 
   function resolveBossPhase(game, n) {
@@ -337,16 +358,16 @@ const TS_Engine = (() => {
     game.bossVulnerableActive = false;
 
     if (game.isBossStunned) {
-      pushLog(game, '적이 기절 상태라 이번 페이즈에는 기술을 쓰지 못했습니다.');
+      pushLog(game, '적이 무너져 이번 페이즈에는 초식을 쓰지 못했습니다.');
       game.isBossStunned = false;
-      // 기절 페이즈에도 최소 반환 보장을 적용 — 없으면 BREAK 직후 턴에
+      // 기절 페이즈에도 최소 반환 보장을 적용 — 없으면 파훼 직후 합에
       // 오히려 가장 얕은 반환이 나오는 최악의 경우가 생긴다.
       game.gauge = clampReturnedGauge(-n);
       return;
     }
 
     if (n >= game.breakThreshold) {
-      pushLog(game, `[BREAK!] E${n} 도달 — 적 행동 취소, 1턴 기절, 다음 턴 취약 부여.`);
+      pushLog(game, `[파훼!] 적${n} 도달 — 적 행동 취소, 1합 무너짐, 다음 합 사혈 노출.`);
       pushFx(game, 'break', {});
       game.isBossStunned = true;
       game.bossVulnerableActive = true;
@@ -362,7 +383,7 @@ const TS_Engine = (() => {
       pushLog(game, `최소 반환 보장 — ${gaugeLabel(finalGauge)} → ${gaugeLabel(game.gauge)}으로 보정.`);
     }
     pushFx(game, 'memory', { to: game.gauge });
-    pushLog(game, `적 페이즈 종료 — ${gaugeLabel(game.gauge)}에서 내 턴이 시작됩니다.`);
+    pushLog(game, `적 페이즈 종료 — ${gaugeLabel(game.gauge)}에서 내 합이 시작됩니다.`);
   }
 
   function endPlayerTurnAndResolveBoss(game, n) {
@@ -378,7 +399,7 @@ const TS_Engine = (() => {
     if (idx === -1) return;
     const card = game.hand[idx];
 
-    // HP를 코스트로 쓰는 카드(옐로우)는 자기 체력으로 죽을 수 없다
+    // HP를 코스트로 쓰는 카드(자)는 자기 체력으로 죽을 수 없다
     if (card.hpCost && card.hpCost >= game.playerHp) {
       pushLog(game, `[${card.name}] — 체력이 부족해 사용할 수 없습니다.`);
       return;
@@ -393,7 +414,7 @@ const TS_Engine = (() => {
     if (card.exhaust) pushLog(game, `[${card.name}] 소멸 — 이번 전투에서 사라집니다.`);
     else game.discardPile.push(card);
 
-    // 패 파기 (블루) — 남은 손패를 전부 버리고 버린 장수만큼 피해를 더한다.
+    // 패 파기 (흑) — 남은 손패를 전부 버리고 버린 장수만큼 피해를 더한다.
     // 파기한 장수는 다음 턴 보충 드로우에 포함되므로 손패가 줄지 않는다.
     let discardBonus = 0;
     if (card.discardAll) {
@@ -410,14 +431,14 @@ const TS_Engine = (() => {
     }
 
     let effectiveDamage = card.damage + discardBonus;
-    // 연계 (레드) — 이번 턴에 "이미" 사용한 카드 수만큼 가산. cardsPlayedThisTurn은
+    // 연계 (적) — 이번 턴에 "이미" 사용한 카드 수만큼 가산. cardsPlayedThisTurn은
     // 이 아래에서 증가하므로 자기 자신은 세지 않는다.
     if (card.chain) {
       const bonus = card.chain * game.cardsPlayedThisTurn;
       effectiveDamage += bonus;
       if (bonus > 0) pushLog(game, `연계 ${game.cardsPlayedThisTurn}장 — 추가 피해 ${bonus}.`);
     }
-    // 방어도 환산 (블랙) — 카드 자신의 방어도는 아래에서 붙으므로 포함되지 않는다.
+    // 방어도 환산 (백) — 카드 자신의 방어도는 아래에서 붙으므로 포함되지 않는다.
     if (card.blockToDamage) {
       const bonus = game.playerBlock * card.blockToDamage;
       effectiveDamage += bonus;
@@ -438,7 +459,7 @@ const TS_Engine = (() => {
       const dealt = applyDamageToBoss(game, effectiveDamage);
       pushLog(game, `[${card.name}] 사용 — ${dealt} 피해.`);
       pushFx(game, 'playerAttack', { amount: dealt, label: card.name });
-      // 흡혈 (옐로우) — 입힌 피해의 N%를 회복
+      // 흡혈 (자) — 입힌 피해의 N%를 회복
       if (card.lifesteal) {
         const healed = healPlayer(game, Math.round(dealt * card.lifesteal / 100));
         if (healed > 0) pushLog(game, `흡혈 — 체력 +${healed}.`);
@@ -458,45 +479,55 @@ const TS_Engine = (() => {
     }
     if (card.draw) {
       drawCards(game, card.draw);
-      pushLog(game, `카드 ${card.draw}장 드로우.`);
+      pushLog(game, `초식을 더 뽑습니다 — 카드 ${card.draw}장.`);
     }
     if (card.counter) {
       game.counterDamage += card.counter;
-      pushLog(game, `다음 피격 시 반격 ${game.counterDamage} 준비.`);
+      pushLog(game, `다음 피격 시 반탄 ${game.counterDamage} 준비.`);
+    }
+    if (card.evade) {
+      game.evadeCharges += card.evade;
+      pushLog(game, `흘리기 ${card.evade}회 준비 (총 ${game.evadeCharges}회).`);
     }
     if (card.bossWeaken) {
       game.bossWeakenActive = true;
       pushLog(game, '다음 적 공격 피해 -25%.');
     }
     if (card.breakThresholdDown) {
+      // 하한은 적max - 2, 최소 적3 (gdd/02 2-3). 절대값으로 잡으면 임계점이
+      // 낮은 적에겐 무효, 높은 적에겐 파격이 되어 같은 카드가 상대에 따라
+      // 무의미하거나 압도적이 된다.
+      const floor = Math.max(3, game.baseBreakThreshold - 2);
       const before = game.breakThreshold;
-      game.breakThreshold = Math.max(4, game.breakThreshold - card.breakThresholdDown);
-      pushLog(game, `BREAK 기준값 E${before} → E${game.breakThreshold}.`);
+      game.breakThreshold = Math.max(floor, game.breakThreshold - card.breakThresholdDown);
+      pushLog(game, before === game.breakThreshold
+        ? `파훼 임계점은 이미 하한(적${floor})입니다.`
+        : `파훼 임계점 적${before} → 적${game.breakThreshold}.`);
     }
 
     // 태그형 효과
     if (card.effect === 'REDUCE_NEXT_COST') {
       game.pendingCostReduction = 1;
-      pushLog(game, '다음 카드 비용 -1.');
+      pushLog(game, '다음 초식의 틈 -1.');
     } else if (card.effect === 'DOUBLE_NEXT_ATTACK') {
       game.pendingDamageMultiplier = 2;
-      pushLog(game, '다음 공격 카드 피해 2배.');
+      pushLog(game, '다음 공격 초식 피해 2배.');
     } else if (card.effect === 'PERSISTENT_DAMAGE_BOOST') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'DAMAGE_BOOST' });
-      pushLog(game, `[${p.name}] 설치 — ${p.turns}턴간 공격 피해 +${p.amount}.`);
+      pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 공격 피해 +${p.amount}.`);
     } else if (card.effect === 'PERSISTENT_BLOCK_ON_TURN_START') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'BLOCK_ON_TURN_START' });
-      pushLog(game, `[${p.name}] 설치 — 다음 턴부터 ${p.turns}턴간 방어도 +${p.amount}.`);
+      pushLog(game, `[${p.name}] 운용 — 다음 합부터 ${p.turns}합간 방어도 +${p.amount}.`);
     } else if (card.effect === 'PERSISTENT_BOSS_VULNERABLE') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'BOSS_VULNERABLE_AURA' });
-      pushLog(game, `[${p.name}] 설치 — ${p.turns}턴간 적 받는 피해 +${p.amount}%.`);
+      pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 적 받는 피해 +${p.amount}%.`);
     } else if (card.effect === 'PERSISTENT_HEAL_ON_TURN_START') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'HEAL_ON_TURN_START' });
-      pushLog(game, `[${p.name}] 설치 — 다음 턴부터 ${p.turns}턴간 체력 +${p.amount}.`);
+      pushLog(game, `[${p.name}] 운용 — 다음 합부터 ${p.turns}합간 체력 +${p.amount}.`);
     }
 
     // 콤보 드로우 (gdd/07 7-3)
@@ -507,7 +538,7 @@ const TS_Engine = (() => {
       if (game.bossHp > 0) {
         drawCards(game, 1);
         game.comboBonusDrawsThisTurn += 1;
-        pushLog(game, '콤보 발동! 카드 1장 추가 드로우.');
+        pushLog(game, '연환! 카드 1장 추가 드로우.');
       }
     }
 
@@ -516,10 +547,11 @@ const TS_Engine = (() => {
     // 비용은 오른쪽(+), 되감기는 왼쪽(-) — 합산 결과로 턴 종료를 판정
     const rawGauge = game.gauge + effectiveCost - (card.rewind || 0);
     if (rawGauge > 0) {
-      const n = Math.min(rawGauge, D.GAUGE_MAX);
+      // 적max를 넘긴 초과분은 버린다 — 파훼는 임계점 도달로 이미 확정된다
+      const n = Math.min(rawGauge, game.breakThreshold);
       game.gauge = n;
       pushFx(game, 'memory', { to: n });
-      pushLog(game, `게이지가 ${gaugeLabel(n)}(으)로 넘어가 턴이 종료됩니다.`);
+      pushLog(game, `기세가 ${gaugeLabel(n)}(으)로 넘어가 선이 적에게 넘어갑니다.`);
       endPlayerTurnAndResolveBoss(game, n);
     } else {
       game.gauge = Math.max(rawGauge, D.GAUGE_MIN);
@@ -527,10 +559,10 @@ const TS_Engine = (() => {
     }
   }
 
-  // "드로우" 액션 — 메모리를 카드로 환전하는 공통 행동 (gdd/07 7-1).
+  // "드로우" 액션 — 기세를 카드로 환전하는 공통 행동 (gdd/07 7-1).
   // 비용 2짜리 카드를 낸 것과 동일하게 처리되므로, 게이지가 0을 넘으면
   // 그대로 턴이 끝난다. 별도의 "패스"는 없다 — 턴을 넘기려면 반드시
-  // 메모리를 밀어야 하고, 그 대가로 항상 카드를 받는다.
+  // 기세를 밀어야 하고, 그 대가로 항상 카드를 받는다.
   function drawAction(game) {
     if (game.status !== 'PLAYING') return;
     const before = game.gauge;
@@ -539,11 +571,11 @@ const TS_Engine = (() => {
     drawCards(game, D.DRAW_ACTION_CARDS);
     const drawn = game.hand.length - handBefore;
     pushLog(game, drawn > 0
-      ? `드로우 — 메모리 ${D.DRAW_ACTION_COST} 소모 (${gaugeLabel(before)} → ${gaugeLabel(Math.min(pushedGauge, D.GAUGE_MAX))}), 카드 ${drawn}장.`
-      : `드로우 — 뽑을 카드가 없어 메모리 ${D.DRAW_ACTION_COST}만 소모했습니다.`);
+      ? `숨 고르기 — 기세 ${D.DRAW_ACTION_COST} 소모 (${gaugeLabel(before)} → ${gaugeLabel(Math.min(pushedGauge, D.GAUGE_MAX))}), 카드 ${drawn}장.`
+      : `숨 고르기 — 뽑을 카드가 없어 기세 ${D.DRAW_ACTION_COST}만 소모했습니다.`);
 
     if (pushedGauge > 0) {
-      const n = Math.min(pushedGauge, D.GAUGE_MAX);
+      const n = Math.min(pushedGauge, game.breakThreshold);
       game.gauge = n;
       pushFx(game, 'memory', { to: n });
       endPlayerTurnAndResolveBoss(game, n);

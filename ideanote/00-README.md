@@ -21,13 +21,10 @@
 
 ## 용어
 
-무림 용어의 정본은 [002-murim-theme.md](002-murim-theme.md)의 "용어 정본"
-표입니다. 노트를 쓸 때는 그 표를 따릅니다 — **기세**(메모리 게이지),
-**틈**(카드 코스트), **아/적**(`P`/`E`), **파훼**(BREAK), **숨 고르기**
+**무림 용어의 정본은 [gdd/12-murim-terms.md](../gdd/12-murim-terms.md)로
+졸업했습니다.** 노트를 쓸 때는 그 문서를 따릅니다 — **기세**(게이지),
+**틈**(코스트), **아/적**, **합**(턴), **파훼**(BREAK), **숨 고르기**
 (드로우 액션).
-
-`gdd/`와 `web-demo/`는 아직 옛 용어를 씁니다. 테마 교체가 채택되기 전까지는
-그대로 두고, 노트에서 `gdd/` 규칙을 인용할 때만 옛 표기가 섞입니다.
 
 ## 상태 표기
 
@@ -35,20 +32,32 @@
 | --- | --- |
 | 🌱 씨앗 | 방금 적음. 아직 아무것도 검증 안 됨 |
 | 🔍 검토중 | 시뮬레이션/데모로 확인해 보는 중 |
-| ✅ 채택 | `gdd/`로 졸업. 링크만 남김 |
-| ❌ 보류 | 안 하기로 함. **지우지 말고** 이유를 남길 것 |
+| ✅ 채택 | `gdd/`로 졸업. **규칙 본문은 gdd에만 둡니다** |
+| 🔶 부분 채택 | 일부만 졸업. 무엇이 남았는지 노트 머리에 적습니다 |
+| ⏸ 보류 | 지금은 안 함. **지우지 말고** 이유를 남길 것 |
 
 보류된 아이디어를 지우지 않는 이유: 같은 발상이 몇 달 뒤에 또 떠오르는데,
 그때 "왜 접었는지"가 남아 있으면 같은 검증을 두 번 하지 않아도 됩니다.
+
+**채택된 노트의 규칙 본문은 gdd로 옮기고 노트에는 남기지 않습니다.** 정본이
+둘이면 반드시 어긋나고, 그때 어느 쪽이 맞는지 아무도 모르게 됩니다.
+
+## 지금 무엇을 하고 있나 (2026-09-04)
+
+`gdd/`가 4색(적·흑·백·자)과 스테이지 1~10의 재미를 담당합니다. 위 색인의
+보류 항목은 **그 둘이 재미있다는 게 확인된 뒤에** 다시 꺼냅니다 — 특히
+색을 5~7로 늘리는 것은 [11-3의 "컬러별 출구"](../gdd/11-card-tiers.md)를
+색마다 하나씩 더 설계해야 한다는 뜻이라, 현재 4색이 균형을 잡기 전에는
+비용만 늘어납니다.
 
 ## 색인
 
 | 노트 | 상태 | 한 줄 요약 |
 | --- | --- | --- |
-| [001-artifact-system.md](001-artifact-system.md) | 🌱 씨앗 | 기세 규칙 자체를 비트는 유물 시스템 |
-| [002-murim-theme.md](002-murim-theme.md) | 🌱 씨앗 | 무림 단일 세계관으로 테마 교체 + 무협 자료 모음 |
-| [003-hap-exchange-memory.md](003-hap-exchange-memory.md) | 🌱 씨앗 | 역량에 따른 가변 기세 폭, 오버 파훼, 적의 마무리 선택 |
-| [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | 🌱 씨앗 | 누적 수련 해금 + 숨겨진 조건(깨달음) 카드 |
-| [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | 🌱 씨앗 | 특정 순서로 터지는 강제 발동 절초 (비용도 함께 지불) |
-| [006-color-factions.md](006-color-factions.md) | 🌱 씨앗 | 4색 → 오방색(정색5) + 간색. 당가=녹 · 마교=자 · 무당=흑 확정 |
-| [007-ip-safety.md](007-ip-safety.md) | 🌱 씨앗 | 저작권·상표 3등급 분류. 디지몬 고유 명칭(테이머/옵션/메모리) 제거 대상 |
+| [002-murim-theme.md](002-murim-theme.md) | ✅ 채택 | 용어 정본 → [gdd/12](../gdd/12-murim-terms.md). 무협 자료 모음은 여기 유지 |
+| [007-ip-safety.md](007-ip-safety.md) | ✅ 채택 | 이름 원칙 → [gdd/12-6](../gdd/12-murim-terms.md). 개별 판정 근거는 여기 유지 |
+| [006-color-factions.md](006-color-factions.md) | 🔶 부분 채택 | 4색 배정(적·흑·백·자) → [gdd/03](../gdd/03-color-archetypes.md). **5~7색 확장은 보류** |
+| [003-hap-exchange-memory.md](003-hap-exchange-memory.md) | 🔶 부분 채택 | `적max`·클로저 성격 → [gdd/02](../gdd/02-boss-intent-thresholds.md)·[08](../gdd/08-boss-skill-loop.md)·[10](../gdd/10-enemy-roster.md). **가변 `아max`·오버 파훼·허초는 보류** |
+| [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | ⏸ 보류 | 새 시스템. 현재 4색 출구를 다듬는 게 먼저 |
+| [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | ⏸ 보류 | 런 간 메타 진행. 한 런의 재미가 먼저 |
+| [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |
