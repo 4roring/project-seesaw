@@ -72,9 +72,13 @@ const TS_Engine = (() => {
       comboCounter: 0,
       comboBonusDrawsThisTurn: 0,
       cardsDiscardedThisTurn: 0, // 패 파기 카드로 버린 장수 — 보충 드로우에 포함
-      // 이번 합에 지불한 틈의 합 = "몰아치기". 이 값이 빈틈에 닿으면 파훼
-      // (gdd/02 2-1). 되감기는 빼지 않는다 — 되감기는 더 많이 몰아칠 수 있게
-      // 해주는 수단이므로, 흑(무당)의 "합을 늘린다"가 파훼로 이어진다.
+      // 이번 합에 "초식으로" 지불한 틈의 합 = 몰아치기. 이 값이 빈틈에 닿으면
+      // 파훼 (gdd/02 2-1).
+      //   - 되감기는 빼지 않는다: 더 많이 몰아칠 수 있게 해주는 수단이므로
+      //     흑(무당)의 "합을 늘린다"가 파훼로 이어진다.
+      //   - 숨 고르기는 포함하지 않는다: 물러서며 숨을 고르는 행동으로
+      //     상대 초식을 깨뜨릴 수는 없다. 포함하면 카드를 한 장도 내지 않고
+      //     숨 고르기만 반복해 파훼가 나는 구멍이 생긴다 (실측 확인).
       momentumSpentThisTurn: 0,
 
       drawPile: buildDeck(config.deck),
@@ -109,8 +113,11 @@ const TS_Engine = (() => {
     // 직전 턴에 "손에서 빠져나간" 카드 수(사용 + 파기) - 콤보로 당겨 쓴 수만큼
     // 보충 (핸드는 유지). 파기를 세지 않으면 패 파기 카드가 손패를 영구히
     // 줄이는 함정이 된다. gdd/07-turn-economy-revision.md 7-2
-    const refillCount = Math.max(0,
+    let refillCount = Math.max(0,
       game.cardsPlayedThisTurn + game.cardsDiscardedThisTurn - game.comboBonusDrawsThisTurn);
+    // 보충 상한 — null이면 무제한. 상한을 걸면 손패가 서서히 줄어들어
+    // 숨 고르기와 문파별 드로우 초식의 값이 올라간다.
+    if (D.REFILL_CAP != null) refillCount = Math.min(refillCount, D.REFILL_CAP);
     game.playerBlock = 0;
     // pendingCostReduction / pendingDamageMultiplier는 리셋하지 않는다 — 실제로
     // 카드에 소비될 때까지 턴을 넘겨도 유지 (gdd/06 6-6)
@@ -586,7 +593,6 @@ const TS_Engine = (() => {
     if (game.status !== 'PLAYING') return;
     const before = game.gauge;
     const pushedGauge = game.gauge + D.DRAW_ACTION_COST;
-    game.momentumSpentThisTurn += D.DRAW_ACTION_COST;
     const handBefore = game.hand.length;
     drawCards(game, D.DRAW_ACTION_CARDS);
     const drawn = game.hand.length - handBefore;

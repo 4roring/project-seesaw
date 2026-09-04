@@ -7,6 +7,7 @@ const TS_DATA = {
   STARTING_GAUGE: -3, // 아3
   STARTING_PLAYER_HP: 80,
   HAND_SIZE: 5, // 시작 핸드 크기 (이후로는 사용한 만큼만 보충 — gdd 07 문서)
+  REFILL_CAP: null, // 합 시작 보충 드로우의 상한. null이면 무제한(빠져나간 만큼 전부)
   DRAW_ACTION_COST: 2, // "숨 고르기"가 내주는 기세 (적 쪽으로 미는 양)
   DRAW_ACTION_CARDS: 1, // "숨 고르기"로 뽑는 카드 수
   COMBO_THRESHOLD: 3, // 이번 합의 카드 사용 수가 이 값에 도달할 때마다 추가 드로우
