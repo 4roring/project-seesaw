@@ -25,6 +25,7 @@
 | --- | --- |
 | [`gdd/`](gdd/) | 기획 문서 (1~11장). 시작은 [gdd/00-README.md](gdd/00-README.md) |
 | [`web-demo/`](web-demo/) | 빌드 도구 없는 순수 HTML/CSS/JS 전투 프로토타입 |
+| [`ideanote/`](ideanote/) | 아직 확정되지 않은 아이디어 메모. 시작은 [ideanote/00-README.md](ideanote/00-README.md) |
 
 ## 웹 데모 실행
 
