@@ -58,6 +58,7 @@ const TS_Run = (() => {
       deck: state.deck,
       playerHp: state.playerHp,
       playerMaxHp: state.playerMaxHp,
+      handCap: (D.COLORS[state.color] || {}).handCap,
     });
     state.phase = 'BATTLE';
   }

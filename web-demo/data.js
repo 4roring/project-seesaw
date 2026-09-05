@@ -7,7 +7,14 @@ const TS_DATA = {
   STARTING_GAUGE: -3, // 아3
   STARTING_PLAYER_HP: 80,
   HAND_SIZE: 5, // 시작 핸드 크기 (이후로는 사용한 만큼만 보충 — gdd 07 문서)
-  REFILL_CAP: null, // 합 시작 보충 드로우의 상한. null이면 무제한(빠져나간 만큼 전부)
+  REFILL_CAP: null, // 합 시작 보충 드로우의 "장수" 상한. null이면 무제한
+  // 합 시작 보충 후 손패가 넘지 못하는 크기(기본값). 드로우 초식으로 뽑은
+  // 장수는 보충량에서 빠지지 않아(연환 드로우와 달리) 손패가 합마다 영구히
+  // 불어난다. 그 누수를 막는 뚜껑이다 — 이미 넘겨 들고 있으면 보충은 0.
+  // 문파별로 COLORS[*].handCap이 이 값을 덮어쓴다.
+  HAND_REFILL_CAP: null,
+  // 드로우 초식으로 뽑은 장수를 보충량에서 뺄 것인가 (연환 드로우와 동일 취급)
+  SUBTRACT_CARD_DRAWS: true,
   DRAW_ACTION_COST: 2, // "숨 고르기"가 내주는 기세 (적 쪽으로 미는 양)
   DRAW_ACTION_CARDS: 1, // "숨 고르기"로 뽑는 카드 수
   COMBO_THRESHOLD: 3, // 이번 합의 카드 사용 수가 이 값에 도달할 때마다 추가 드로우
@@ -34,10 +41,12 @@ const TS_DATA = {
   // ─────────────────────────────────────────────────────────────
   COLORS: {
     // 오방색 — gdd/03-color-archetypes.md 3-1. 내부 키는 그대로 두고 표시만 바꾼다.
-    RED: { name: '적(赤)', sect: '화산파', icon: '🌸', desc: '초식을 이어 쓸수록 커지는 연환으로 한 합에 터뜨리는 문파' },
-    BLUE: { name: '흑(黑)', sect: '무당파', icon: '☯', desc: '기세를 되감아 합을 늘리고, 쌓인 손패를 한 번에 환전하는 문파' },
-    BLACK: { name: '백(白)', sect: '금강사', icon: '卍', desc: '금강불괴와 반탄강기로 버티고 파훼 임계점을 끌어내리는 문파' },
-    YELLOW: { name: '자(紫)', sect: '마교', icon: '血', desc: '제 피를 태워 초식을 내고 흡성으로 되메우는 금기의 무공' },
+    // handCap: 손패 뚜껑. 드로우가 정체성인 문파는 더 들 수 있다 — 뚜껑을
+    // 일률로 걸면 흑의 패 파기 페이오프(파기 1장당 피해)가 통째로 죽는다.
+    RED: { name: '적(赤)', sect: '화산파', handCap: null, icon: '🌸', desc: '초식을 이어 쓸수록 커지는 연환으로 한 합에 터뜨리는 문파' },
+    BLUE: { name: '흑(黑)', sect: '무당파', handCap: null, icon: '☯', desc: '기세를 되감아 합을 늘리고, 쌓인 손패를 한 번에 환전하는 문파' },
+    BLACK: { name: '백(白)', sect: '금강사', handCap: null, icon: '卍', desc: '금강불괴와 반탄강기로 버티고 파훼 임계점을 끌어내리는 문파' },
+    YELLOW: { name: '자(紫)', sect: '마교', handCap: null, icon: '血', desc: '제 피를 태워 초식을 내고 흡성으로 되메우는 금기의 무공' },
   },
 
   // 시작 덱 (컬러별 10장) — gdd/11-card-tiers.md
@@ -65,7 +74,7 @@ const TS_DATA = {
       { key: 'overload_info', name: '행운유수', cost: 1, damage: 5, block: 0, count: 2, draw: 1, desc: '피해 5, 카드 1장 드로우' },
       // 패 파기 페이오프 — 흑(黑)은 드로우로 손패를 쌓으므로 그걸 화력으로 환전한다.
       // 파기한 장수는 다음 턴 보충에 포함되어 손패가 영구히 줄지 않는다.
-      { key: 'memflush', name: '배수일전', cost: 2, damage: 4, block: 0, count: 1, discardAll: 5, desc: '피해 4 + 손패를 전부 파기하고 버린 1장당 피해 5' },
+      { key: 'memflush', name: '배수일전', cost: 2, damage: 4, block: 0, count: 1, discardAll: 8, desc: '피해 4 + 손패를 전부 파기하고 버린 1장당 피해 8' },
     ],
     BLACK: [
       { key: 'guard', name: '금강불괴', cost: 1, damage: 0, block: 8, count: 3, desc: '방어도 8' },
@@ -131,7 +140,7 @@ const TS_DATA = {
         { key: 'hack', name: '사량발천', cost: 2, damage: 13, block: 0, rewind: 1, desc: '피해 13, 기세 1 되감기' },
         { key: 'cache_amp', name: '진법: 양의진', cost: 2, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '양의진', amount: 2, turns: 3 }, desc: '3합간 공격 초식 피해 +2' },
         { key: 'parallel', name: '양의쌍수', cost: 3, damage: 19, block: 0, draw: 1, desc: '피해 19, 카드 1장 드로우' },
-        { key: 'cache_burn', name: '배수결의', cost: 2, damage: 6, block: 0, discardAll: 7, desc: '피해 6 + 파기한 1장당 피해 7' },
+        { key: 'cache_burn', name: '배수결의', cost: 2, damage: 6, block: 0, discardAll: 11, desc: '피해 6 + 파기한 1장당 피해 11' },
         { key: 'logic_bomb', name: '태극붕권', cost: 3, damage: 14, block: 8, desc: '피해 14, 방어도 8' },
         { key: 'defrag', name: '조식정기', cost: 2, damage: 0, block: 0, draw: 2, rewind: 1, desc: '카드 2장 드로우, 기세 1 되감기' },
         { key: 'redirect', name: '이화접목', cost: 2, damage: 0, block: 0, evade: 2, desc: '다음 피격 2회를 흘려보냄' },
@@ -142,7 +151,7 @@ const TS_DATA = {
         { key: 'codebreak', name: '태극파천', cost: 5, damage: 40, block: 0, desc: '피해 40' },
         { key: 'system_down', name: '역천환류', cost: 5, damage: 39, block: 0, rewind: 2, desc: '피해 39, 기세 2 되감기' },
         { key: 'infinite_calc', name: '만류귀종', cost: 4, damage: 30, block: 0, draw: 3, desc: '피해 30, 카드 3장 드로우' },
-        { key: 'total_flush', name: '배수천붕', cost: 3, damage: 8, block: 0, discardAll: 11, desc: '피해 8 + 파기한 1장당 피해 11' },
+        { key: 'total_flush', name: '배수천붕', cost: 3, damage: 8, block: 0, discardAll: 17, desc: '피해 8 + 파기한 1장당 피해 17' },
         { key: 'deep_calc', name: '현천심법', cost: 5, damage: 34, block: 0, draw: 2, rewind: 1, desc: '피해 34, 카드 2장 드로우, 기세 1 되감기' },
         { key: 'firewall', name: '현무방벽', cost: 2, damage: 0, block: 18, draw: 1, desc: '방어도 18, 카드 1장 드로우' },
         { key: 'taiji_step', name: '태극신법', cost: 3, damage: 0, block: 0, evade: 3, draw: 2, desc: '다음 피격 3회를 흘려보냄, 카드 2장 드로우' },
@@ -207,7 +216,7 @@ const TS_DATA = {
     datashard: { damage: 9 }, parallel_scan: { draw: 3 }, backup_circuit: { block: 9 },
     calc_boost: { damage: 11 }, delay_loop: { block: 12 },
     deflect: { evade: 2 }, cloud_step: { evade: 2 }, redirect: { evade: 3 },
-    memflush: { discardAll: 7 },
+    memflush: { discardAll: 11 },
     chain: { damage: 9 }, overload_info: { damage: 4 },
     guard: { block: 12 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
     ironwall: { block: 10 }, shield_bash: { damage: 5 }, counter_stance: { counter: 8 },

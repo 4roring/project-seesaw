@@ -51,6 +51,8 @@ const TS_Engine = (() => {
       breakThreshold: enemy.breakThreshold,
       closerStyle: enemy.closerStyle || 'DOMINANT', // 패도 | 노회 (gdd/08 8-4-1)
       enemyRealm: enemy.realm || '',
+      // 손패 뚜껑은 문파마다 다르다 (gdd/07 7-2)
+      handRefillCap: config.handCap != null ? config.handCap : D.HAND_REFILL_CAP,
 
       // 정확히 1턴만 유효한 상태
       playerWeakenActive: false,
@@ -71,6 +73,7 @@ const TS_Engine = (() => {
       cardsPlayedThisTurn: 0,
       comboCounter: 0,
       comboBonusDrawsThisTurn: 0,
+      cardDrawsThisTurn: 0,      // 초식 효과로 뽑은 장수 — 보충량에서 뺀다
       cardsDiscardedThisTurn: 0, // 패 파기 카드로 버린 장수 — 보충 드로우에 포함
       // 이번 합에 "초식으로" 지불한 틈의 합 = 몰아치기. 이 값이 빈틈에 닿으면
       // 파훼 (gdd/02 2-1).
@@ -113,17 +116,29 @@ const TS_Engine = (() => {
     // 직전 턴에 "손에서 빠져나간" 카드 수(사용 + 파기) - 콤보로 당겨 쓴 수만큼
     // 보충 (핸드는 유지). 파기를 세지 않으면 패 파기 카드가 손패를 영구히
     // 줄이는 함정이 된다. gdd/07-turn-economy-revision.md 7-2
+    // 손에서 빠져나간 수 − 이번 합에 이미 당겨 쓴 수.
+    // 연환 드로우와 드로우 초식은 둘 다 "이번 합에 쓸 카드를 미리 당겨오는"
+    // 효과이지 손패 총량을 늘리는 효과가 아니다. 드로우 초식만 안 빼고 있어서
+    // 초식 한 장당 손패가 영구히 +1씩 불어나고 있었다 (gdd/07 7-2).
+    const drawnAhead = game.comboBonusDrawsThisTurn
+      + (D.SUBTRACT_CARD_DRAWS ? game.cardDrawsThisTurn : 0);
     let refillCount = Math.max(0,
-      game.cardsPlayedThisTurn + game.cardsDiscardedThisTurn - game.comboBonusDrawsThisTurn);
-    // 보충 상한 — null이면 무제한. 상한을 걸면 손패가 서서히 줄어들어
-    // 숨 고르기와 문파별 드로우 초식의 값이 올라간다.
+      game.cardsPlayedThisTurn + game.cardsDiscardedThisTurn - drawnAhead);
+    // 보충 장수 상한 — null이면 무제한.
     if (D.REFILL_CAP != null) refillCount = Math.min(refillCount, D.REFILL_CAP);
+    // 손패 크기 뚜껑 — 보충으로 이 크기를 넘기지 않는다. 드로우 초식으로
+    // 뽑은 장수는 보충량에서 빠지지 않아 손패가 합마다 불어나는데, 그걸
+    // 여기서 막는다 (gdd/07 7-2). 이미 넘겨 들고 있으면 보충은 0.
+    if (game.handRefillCap != null) {
+      refillCount = Math.min(refillCount, Math.max(0, game.handRefillCap - game.hand.length));
+    }
     game.playerBlock = 0;
     // pendingCostReduction / pendingDamageMultiplier는 리셋하지 않는다 — 실제로
     // 카드에 소비될 때까지 턴을 넘겨도 유지 (gdd/06 6-6)
     game.cardsPlayedThisTurn = 0;
     game.comboCounter = 0;
     game.comboBonusDrawsThisTurn = 0;
+    game.cardDrawsThisTurn = 0;
     game.cardsDiscardedThisTurn = 0;
     game.momentumSpentThisTurn = 0;
     tickActiveEffects(game);
@@ -505,6 +520,7 @@ const TS_Engine = (() => {
     }
     if (card.draw) {
       drawCards(game, card.draw);
+      game.cardDrawsThisTurn += card.draw;
       pushLog(game, `초식을 더 뽑습니다 — 카드 ${card.draw}장.`);
     }
     if (card.counter) {

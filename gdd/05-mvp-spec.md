@@ -93,6 +93,7 @@ interface BattleState {
   cardsPlayedThisTurn: number;
   comboCounter: number;
   comboBonusDrawsThisTurn: number;
+  cardDrawsThisTurn: number;       // 드로우 초식으로 뽑은 장수 — 보충량에서 뺀다
   cardsDiscardedThisTurn: number;  // 패 파기로 버린 장수 — 보충 드로우에 포함
   evadeCharges: number;            // 남은 흘리기 횟수 (흑)
 
