@@ -60,4 +60,6 @@
 | [003-hap-exchange-memory.md](003-hap-exchange-memory.md) | 🔶 부분 채택 | `적max`·클로저 성격 → [gdd/02](../gdd/02-boss-intent-thresholds.md)·[08](../gdd/08-boss-skill-loop.md)·[10](../gdd/10-enemy-roster.md). **가변 `아max`·오버 파훼·허초는 보류** |
 | [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | ⏸ 보류 | 새 시스템. 현재 4색 출구를 다듬는 게 먼저 |
 | [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | ⏸ 보류 | 런 간 메타 진행. 한 런의 재미가 먼저 |
+| [008-ascension-goal.md](008-ascension-goal.md) | ⏸ 보류 | 런의 목표 = 등선(登仙). 클리어할수록 높아지는 난이도 사다리. 004와 한 쌍 |
+| [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **전투 규칙을 안 건드려 병렬 진행 가능** |
 | [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |
