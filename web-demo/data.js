@@ -251,91 +251,91 @@ const TS_DATA = {
   // ─────────────────────────────────────────────────────────────
   ENEMIES: [
     {
-      name: '노상 낭인', icon: '🗡️', realm: '삼류', hp: 75,
-      breakThreshold: 7, closerStyle: 'DOMINANT',
-      skills: [
-        { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 2, cooldown: 0, priority: 10 },
-        { key: 'power_charge', name: '기수식', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 6, cooldown: 4, priority: 20 },
-        { key: 'heavy_strike', name: '내려베기', cost: 3, kind: 'ATTACK_WEAKEN', damage: 4, cooldown: 2, priority: 30 },
-        { key: 'aoe_slam', name: '횡소천군', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 5, cooldown: 4, priority: 40 },
-      ],
-    },
-    {
-      name: '흑풍 도적', icon: '🪓', realm: '삼류', hp: 85,
+      name: '노상 낭인', icon: '🗡️', realm: '삼류', hp: 90,
       breakThreshold: 6, closerStyle: 'DOMINANT',
       skills: [
-        { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 2, cooldown: 0, priority: 10 },
-        { key: 'dash', name: '흑풍보', cost: 2, kind: 'ATTACK', damage: 4, cooldown: 1, priority: 25 },
-        { key: 'blast', name: '난도질', cost: 3, kind: 'ATTACK_VULNERABLE', damage: 6, cooldown: 3, priority: 35 },
+        { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'power_charge', name: '기수식', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 6, cooldown: 4, priority: 20 },
+        { key: 'heavy_strike', name: '내려베기', cost: 3, kind: 'ATTACK_WEAKEN', damage: 8, cooldown: 2, priority: 30 },
+        { key: 'aoe_slam', name: '횡소천군', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 10, cooldown: 4, priority: 40 },
       ],
     },
     {
-      name: '철벽 무승', icon: '🛡️', realm: '이류', hp: 95,
-      breakThreshold: 12, closerStyle: 'DOMINANT',
+      name: '흑풍 도적', icon: '🪓', realm: '삼류', hp: 102,
+      breakThreshold: 5, closerStyle: 'DOMINANT',
       skills: [
-        { key: 'normal_attack', name: '장타', cost: 1, kind: 'ATTACK', damage: 3, cooldown: 0, priority: 10 },
-        { key: 'plating', name: '금강신공', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 10, cooldown: 4, priority: 20 },
-        { key: 'counter_charge', name: '나한권', cost: 3, kind: 'ATTACK_WEAKEN', damage: 6, cooldown: 2, priority: 30 },
-        { key: 'temple_quake', name: '진산장', cost: 6, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 4, priority: 40 },
+        { key: 'normal_attack', name: '헛손질', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'dash', name: '흑풍보', cost: 2, kind: 'ATTACK', damage: 8, cooldown: 1, priority: 25 },
+        { key: 'blast', name: '난도질', cost: 3, kind: 'ATTACK_VULNERABLE', damage: 11, cooldown: 3, priority: 35 },
       ],
     },
     {
-      name: '쌍도 자객', icon: '🥷', realm: '이류', hp: 108,
-      breakThreshold: 9, closerStyle: 'CRAFTY',
-      skills: [
-        { key: 'normal_attack', name: '스침', cost: 1, kind: 'ATTACK', damage: 3, cooldown: 0, priority: 10 },
-        { key: 'slash_combo', name: '연환도', cost: 2, kind: 'ATTACK', damage: 5, cooldown: 1, priority: 25 },
-        { key: 'shadow_strike', name: '암향표', cost: 3, kind: 'ATTACK_WEAKEN', damage: 7, cooldown: 2, priority: 35 },
-        { key: 'night_raid', name: '월야습', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 3, priority: 45 },
-      ],
-    },
-    {
-      name: '독무 술사', icon: '☠️', realm: '일류', hp: 120,
+      name: '철벽 무승', icon: '🛡️', realm: '이류', hp: 114,
       breakThreshold: 9, closerStyle: 'DOMINANT',
       skills: [
-        { key: 'normal_attack', name: '독침', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'normal_attack', name: '장타', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
+        { key: 'plating', name: '금강신공', cost: 2, kind: 'BUFF', powerGain: 1, blockGain: 10, cooldown: 4, priority: 20 },
+        { key: 'counter_charge', name: '나한권', cost: 3, kind: 'ATTACK_WEAKEN', damage: 11, cooldown: 2, priority: 30 },
+        { key: 'temple_quake', name: '진산장', cost: 6, kind: 'ATTACK_VULNERABLE', damage: 16, cooldown: 4, priority: 40 },
+      ],
+    },
+    {
+      name: '쌍도 자객', icon: '🥷', realm: '이류', hp: 124,
+      breakThreshold: 7, closerStyle: 'CRAFTY',
+      skills: [
+        { key: 'normal_attack', name: '스침', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
+        { key: 'slash_combo', name: '연환도', cost: 2, kind: 'ATTACK', damage: 8, cooldown: 1, priority: 25 },
+        { key: 'shadow_strike', name: '암향표', cost: 3, kind: 'ATTACK_WEAKEN', damage: 12, cooldown: 2, priority: 35 },
+        { key: 'night_raid', name: '월야습', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 15, cooldown: 3, priority: 45 },
+      ],
+    },
+    {
+      name: '독무 술사', icon: '☠️', realm: '일류', hp: 119,
+      breakThreshold: 7, closerStyle: 'DOMINANT',
+      skills: [
+        { key: 'normal_attack', name: '독침', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'dark_cycle', name: '독공운기', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 8, cooldown: 4, priority: 20 },
-        { key: 'curse', name: '부식독장', cost: 2, kind: 'ATTACK_WEAKEN', damage: 5, cooldown: 1, priority: 30 },
-        { key: 'wither', name: '만독지기', cost: 3, kind: 'ATTACK_VULNERABLE', damage: 7, cooldown: 2, priority: 35 },
-        { key: 'venom_tide', name: '독무창천', cost: 5, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 4, priority: 45 },
+        { key: 'curse', name: '부식독장', cost: 2, kind: 'ATTACK_WEAKEN', damage: 6, cooldown: 1, priority: 30 },
+        { key: 'wither', name: '만독지기', cost: 3, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 2, priority: 35 },
+        { key: 'venom_tide', name: '독무창천', cost: 5, kind: 'ATTACK_VULNERABLE', damage: 11, cooldown: 4, priority: 45 },
       ],
     },
     {
       // 빈틈이 작으면 자주 파훼당하므로 싸움이 짧아야 한다. 빈틈이 작은데
       // HP까지 높으면 소모전이 되어 버프가 누적되는 적에게 일방적으로
       // 유리해진다 (gdd/10 10-3).
-      name: '폭혈 광인', icon: '🔥', realm: '일류', hp: 100,
+      name: '폭혈 광인', icon: '🔥', realm: '일류', hp: 109,
       breakThreshold: 6, closerStyle: 'DOMINANT',
       skills: [
-        { key: 'normal_attack', name: '주먹질', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'normal_attack', name: '주먹질', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'amplify', name: '폭혈공', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 6, cooldown: 4, priority: 20 },
-        { key: 'heavy_strike', name: '분쇄권', cost: 3, kind: 'ATTACK_WEAKEN', damage: 9, cooldown: 2, priority: 30 },
+        { key: 'heavy_strike', name: '분쇄권', cost: 3, kind: 'ATTACK_WEAKEN', damage: 11, cooldown: 2, priority: 30 },
       ],
     },
     {
-      name: '쌍생 검객', icon: '⚔️', realm: '절정', hp: 150,
-      breakThreshold: 10, closerStyle: 'CRAFTY',
+      name: '쌍생 검객', icon: '⚔️', realm: '절정', hp: 158,
+      breakThreshold: 8, closerStyle: 'CRAFTY',
       skills: [
-        { key: 'normal_attack', name: '견제검', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'normal_attack', name: '견제검', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'regroup', name: '쌍생운기', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 10, cooldown: 4, priority: 20 },
-        { key: 'sync_hit', name: '합격검', cost: 2, kind: 'ATTACK', damage: 5, cooldown: 1, priority: 25 },
-        { key: 'watcher_rage', name: '쌍룡출해', cost: 3, kind: 'ATTACK_WEAKEN', damage: 6, cooldown: 2, priority: 35 },
-        { key: 'doom_gaze', name: '천라검막', cost: 5, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 4, priority: 45 },
+        { key: 'sync_hit', name: '합격검', cost: 2, kind: 'ATTACK', damage: 6, cooldown: 1, priority: 25 },
+        { key: 'watcher_rage', name: '쌍룡출해', cost: 3, kind: 'ATTACK_WEAKEN', damage: 7, cooldown: 2, priority: 35 },
+        { key: 'doom_gaze', name: '천라검막', cost: 5, kind: 'ATTACK_VULNERABLE', damage: 11, cooldown: 4, priority: 45 },
       ],
     },
     {
-      name: '심연 마승', icon: '🕯️', realm: '절정', hp: 168,
-      breakThreshold: 8, closerStyle: 'DOMINANT',
+      name: '심연 마승', icon: '🕯️', realm: '절정', hp: 176,
+      breakThreshold: 6, closerStyle: 'DOMINANT',
       skills: [
-        { key: 'normal_attack', name: '염주격', cost: 1, kind: 'ATTACK', damage: 4, cooldown: 0, priority: 10 },
+        { key: 'normal_attack', name: '염주격', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'abyss_expand', name: '심연운기', cost: 3, kind: 'BUFF', powerGain: 2, blockGain: 12, cooldown: 4, priority: 20 },
-        { key: 'erode', name: '탈혼장', cost: 2, kind: 'ATTACK_WEAKEN', damage: 6, cooldown: 1, priority: 30 },
-        { key: 'devour', name: '아귀탄', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 9, cooldown: 3, priority: 45 },
+        { key: 'erode', name: '탈혼장', cost: 2, kind: 'ATTACK_WEAKEN', damage: 7, cooldown: 1, priority: 30 },
+        { key: 'devour', name: '아귀탄', cost: 4, kind: 'ATTACK_VULNERABLE', damage: 11, cooldown: 3, priority: 45 },
       ],
     },
     {
       name: '혈마', icon: '👑', realm: '초절정', hp: 185,
-      breakThreshold: 12, closerStyle: 'DOMINANT',
+      breakThreshold: 9, closerStyle: 'DOMINANT',
       skills: [
         { key: 'normal_attack', name: '혈조수', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'empower', name: '혈기운용', cost: 2, kind: 'BUFF', powerGain: 2, blockGain: 10, cooldown: 4, priority: 20 },
@@ -346,7 +346,7 @@ const TS_DATA = {
     },
     {
       name: '천마', icon: '💀', realm: '화경', hp: 210,
-      breakThreshold: 13, closerStyle: 'CRAFTY',
+      breakThreshold: 9, closerStyle: 'CRAFTY',
       skills: [
         { key: 'normal_attack', name: '무형지기', cost: 1, kind: 'ATTACK', damage: 5, cooldown: 0, priority: 10 },
         { key: 'absolute_power', name: '천마신공', cost: 2, kind: 'BUFF', powerGain: 3, blockGain: 14, cooldown: 4, priority: 20 },
