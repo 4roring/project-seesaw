@@ -4,6 +4,7 @@
 //   ['RED','BLUE','BLACK','YELLOW'].map(c => TS_Sim.run(c, 40));
 //   TS_Sim.run(c, 40, { planned: true })   // 계획형 정책
 //   TS_Sim.run(c, 40, { casual: true })    // 초심자 정책
+//   TS_Sim.run(c, 40, { search: true })    // 탐색 정책 (수순을 다 따져 본다)
 //
 // 정책 3단계 — 이 폭이 곧 "실력에 따른 난이도 밴드"다.
 //   casual  : 큰 피해만 보고 낸다. 기세를 아껴 쓰지 않고, 파훼를 노리지
@@ -11,6 +12,9 @@
 //   greedy  : 효율(가치/틈)로 고르고 기세를 정확히 맞춰 쓴다. 파훼가 닿으면
 //             노린다. 이미 상당한 수준의 플레이라 "하한"이 아니다.
 //   planned : greedy + 타이밍 판단(패 파기는 손패가 쌓인 뒤, 연계는 나중에).
+//   search  : 한 합에서 낼 수 있는 수순을 실제로 다 돌려 보고 결과가 가장
+//             좋은 것을 고른다. 위 셋은 "카드 하나를 어떻게 고르나"의 정책이라
+//             각자의 맹점이 통계에 그대로 박히는데, 탐색은 그 맹점이 없다.
 // 간단한 탐욕 AI로 런을 자동 플레이해 클리어율·평균 도달 스테이지·
 // 턴당 카드 사용 수·사망 스테이지 분포를 집계한다.
 window.TS_Sim = (() => {
@@ -123,9 +127,105 @@ window.TS_Sim = (() => {
     }
   }
 
+  // ── 탐색 정책 ───────────────────────────────────────────────
+  // 합 하나를 통째로 시뮬레이션해 본다. 합은 기세가 0을 넘어야 끝나므로
+  // 모든 수순은 반드시 합 종료로 끝나고, 그 시점(적 반격까지 끝난 뒤)의
+  // 상태를 평가한다 — 사람이 "이렇게 내면 다음 합이 어떻게 되지?"를
+  // 따지는 것과 같은 층위다.
+  function cloneGame(g) {
+    const log = g.log, fx = g.fx;
+    g.log = []; g.fx = [];              // 로그는 복사할 이유가 없다
+    const c = structuredClone(g);
+    g.log = log; g.fx = fx;
+    return c;
+  }
+
+  // 합이 끝난 뒤의 상태가 얼마나 좋은가.
+  // 플레이어 체력(80)이 적 체력(90~210)보다 귀하므로 가중치를 더 준다.
+  function evalTurn(sim, base) {
+    if (sim.status === 'LOST') return -1e6;
+    const bossDmg = base.bossHp - sim.bossHp;
+    const hpLost = base.playerHp - sim.playerHp;
+    if (sim.status === 'WON') return 1e6 - hpLost * 10;
+    return bossDmg * 1.0
+      - hpLost * 2.2
+      + (-sim.gauge) * 2.5        // 다음 합에 쓸 수 있는 기세
+      + sim.playerBlock * 0.2
+      + sim.hand.length * 0.5;
+  }
+
+  // 같은 key의 카드는 같은 수라 한 번만 가지를 친다
+  function distinctPlays(g) {
+    const seen = new Set(); const out = [];
+    g.hand.forEach((c) => {
+      if (!usable(g, c) || seen.has(c.key)) return;
+      seen.add(c.key); out.push(c);
+    });
+    return out;
+  }
+
+  function searchTurn(g, nodeCap) {
+    const base = { bossHp: g.bossHp, playerHp: g.playerHp };
+    const startTurn = g.turn;
+    let nodes = 0, bestScore = -Infinity, bestPath = null;
+
+    function rec(sim, path) {
+      if (sim.status !== 'PLAYING' || sim.turn !== startTurn) {
+        const sc = evalTurn(sim, base);
+        if (sc > bestScore) { bestScore = sc; bestPath = path; }
+        return;
+      }
+      if (nodes >= nodeCap || path.length >= 8) {
+        const sc = evalTurn(sim, base);
+        if (sc > bestScore) { bestScore = sc; bestPath = path; }
+        return;
+      }
+      // 좋아 보이는 수부터 봐서, 노드 상한에 걸려도 쓸 만한 수순이 남게 한다
+      const cands = distinctPlays(sim).sort((a, b) => score(sim, b) - score(sim, a));
+      cands.forEach((c) => {
+        if (nodes >= nodeCap) return;
+        nodes++;
+        const s2 = cloneGame(sim);
+        E.playCard(s2, s2.hand.find((x) => x.key === c.key).uid);
+        rec(s2, path.concat([{ key: c.key }]));
+      });
+      if (nodes < nodeCap) {
+        nodes++;
+        const s3 = cloneGame(sim);
+        E.drawAction(s3);
+        rec(s3, path.concat([{ draw: true }]));
+      }
+    }
+
+    rec(cloneGame(g), []);
+    return bestPath || [{ draw: true }];
+  }
+
+  function searchAutoTurn(g, stat, nodeCap) {
+    const t = g.turn;
+    stat.turns++;
+    const path = searchTurn(g, nodeCap);
+    for (const step of path) {
+      if (g.status !== 'PLAYING' || g.turn !== t) break;
+      if (step.draw) { stat.draws++; E.drawAction(g); }
+      else {
+        const card = g.hand.find((x) => x.key === step.key);
+        if (!card) break;              // 드로우로 손패가 바뀐 경우
+        stat.plays++; E.playCard(g, card.uid);
+      }
+    }
+    // 수순대로 갔는데도 합이 안 끝났으면 숨 고르기로 마무리
+    let guard = 0;
+    while (g.status === 'PLAYING' && g.turn === t && guard++ < 12) {
+      stat.draws++; E.drawAction(g);
+    }
+  }
+
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
     const casual = !!(opts && opts.casual);
+    const search = !!(opts && opts.search);
+    const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
     const stat = { plays: 0, draws: 0, turns: 0, dist: {} };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
@@ -136,7 +236,8 @@ window.TS_Sim = (() => {
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
         if (st.phase === 'BATTLE') {
           if (st.game.status !== 'PLAYING') { R.syncBattleResult(); continue; }
-          autoTurn(st.game, stat, planned, casual);
+          if (search) searchAutoTurn(st.game, stat, nodeCap);
+          else autoTurn(st.game, stat, planned, casual);
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
           const o = st.rewardOptions.slice();
@@ -152,7 +253,7 @@ window.TS_Sim = (() => {
     }
     return {
       color,
-      policy: casual ? '초심자' : planned ? '계획' : '탐욕',
+      policy: search ? '탐색' : casual ? '초심자' : planned ? '계획' : '탐욕',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
