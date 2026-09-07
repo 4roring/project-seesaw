@@ -49,6 +49,8 @@ const TS_UI = (() => {
       { key: 'hpCost', label: 'HP 소모', text: (v) => `HP ${v} 소모` },
       { key: 'damage', label: '피해', text: (v) => `피해 ${v}` },
       { key: 'chain', label: '연계 피해', text: (v) => `이번 합에 쓴 초식 1장당 피해 +${v}` },
+    { key: 'deepStrike', label: '일격', text: (v) => `남은 버퍼 1칸당 피해 +${v}` },
+    { key: 'rageScale', label: '광기', text: (v) => `잃은 체력 10당 피해 +${v}` },
       { key: 'discardAll', label: '파기 피해', text: (v) => `손패를 전부 파기하고 파기 1장당 피해 +${v}` },
       { key: 'blockToDamage', label: '방어도 환산', text: (v) => (v === 1 ? '현재 방어도만큼 피해 추가' : `현재 방어도 ${v}배만큼 피해 추가`) },
       { key: 'lifesteal', label: '흡혈', text: (v) => `입힌 피해의 ${v}% 회복` },
@@ -59,6 +61,9 @@ const TS_UI = (() => {
       { key: 'rewind', label: '되감기', text: (v) => `기세 ${v} 되감기` },
       { key: 'counter', label: '반탄', text: (v) => `다음 피격 시 반탄 ${v}` },
       { key: 'evade', label: '흘리기', text: (v) => `다음 피격 ${v}회를 흘려보냄` },
+    { key: 'sealSkill', label: '점혈', text: (v) => `적의 가장 비싼 초식을 ${v}합간 봉인` },
+    { key: 'drainPower', label: '공력 흡수', text: (v) => `적이 쌓은 공격력 ${v} 감소` },
+    { key: 'surge', label: '몰아치기', text: (v) => `기세를 쓰지 않고 몰아치기 +${v}` },
       { key: 'breakThresholdDown', label: '빈틈 감소', text: (v) => `이번 전투 빈틈 ${v} 감소` },
     ];
 

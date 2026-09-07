@@ -239,7 +239,9 @@ const TS_Engine = (() => {
       dmg = Math.round(dmg * 1.5);
       game.playerVulnerableActive = false; // 다음 피격 1회 소모
     }
-    const usableBlock = pierce ? Math.floor(game.playerBlock / 2) : game.playerBlock;
+    const usableBlock = pierce
+      ? Math.floor(game.playerBlock * D.CLOSER_BLOCK_RATIO)
+      : game.playerBlock;
     const absorbed = Math.min(usableBlock, dmg);
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
@@ -495,6 +497,23 @@ const TS_Engine = (() => {
       effectiveDamage += bonus;
       if (bonus > 0) pushLog(game, `연계 ${game.cardsPlayedThisTurn}장 — 추가 피해 ${bonus}.`);
     }
+    // 일격 (적 B라인) — 지금 남은 버퍼가 깊을수록 강하다. 연계가 "나중에
+    // 낼수록 강함"이라면 일격은 "먼저 낼수록 강함"이라, 같은 합 안에서
+    // 두 라인이 정반대 순서를 요구한다.
+    if (card.deepStrike) {
+      const depth = Math.max(0, -game.gauge);
+      const bonus = card.deepStrike * depth;
+      effectiveDamage += bonus;
+      if (bonus > 0) pushLog(game, `일격 — 버퍼 아${depth}만큼 추가 피해 ${bonus}.`);
+    }
+    // 광기 (자 B라인) — 잃은 체력 10당 가산. 흡성(되메우기)과 정반대 방향이라
+    // 두 라인이 같은 HP를 놓고 반대로 당긴다.
+    if (card.rageScale) {
+      const lost = Math.floor((game.playerMaxHp - game.playerHp) / 10);
+      const bonus = card.rageScale * lost;
+      effectiveDamage += bonus;
+      if (bonus > 0) pushLog(game, `광기 — 잃은 체력만큼 추가 피해 ${bonus}.`);
+    }
     // 방어도 환산 (백) — 카드 자신의 방어도는 아래에서 붙으므로 포함되지 않는다.
     if (card.blockToDamage) {
       const bonus = game.playerBlock * card.blockToDamage;
@@ -546,6 +565,35 @@ const TS_Engine = (() => {
     if (card.evade) {
       game.evadeCharges += card.evade;
       pushLog(game, `흘리기 ${card.evade}회 준비 (총 ${game.evadeCharges}회).`);
+    }
+    // 점혈 (흑 B라인) — 적의 준비된 초식 중 가장 비싼 것을 봉인한다.
+    // 클로저가 작아지므로 돌아오는 버퍼도 줄어든다 — 안전을 사는 대신
+    // 다음 합이 짧아지는 맞교환이다.
+    if (card.sealSkill) {
+      const ready = game.enemySkills
+        .filter((sk) => (game.bossCooldowns[sk.key] || 0) <= 0)
+        .sort((a, b) => b.cost - a.cost);
+      if (ready.length > 1) {
+        const target = ready[0];
+        game.bossCooldowns[target.key] = Math.max(game.bossCooldowns[target.key] || 0, card.sealSkill);
+        pushLog(game, `점혈 — [${target.name}]을(를) ${card.sealSkill}합간 봉인.`);
+      } else {
+        pushLog(game, '점혈 — 봉인할 초식이 없습니다.');
+      }
+    }
+    // 공력 흡수 (흑) — 적이 버프로 쌓은 공격력을 깎는다
+    if (card.drainPower) {
+      const before = game.bossScalingPower;
+      game.bossScalingPower = Math.max(0, before - card.drainPower);
+      pushLog(game, before > 0
+        ? `공력 흡수 — 적 공격력 ${before} → ${game.bossScalingPower}.`
+        : '공력 흡수 — 적이 쌓아둔 공격력이 없습니다.');
+    }
+    // 몰아치기 가산 (백 B라인) — 기세를 쓰지 않고 몰아치기만 쌓는다.
+    // 초식이 무거워 몰아치기가 안 쌓이던 백이 파훼를 노릴 수 있게 하는 부품.
+    if (card.surge) {
+      game.momentumSpentThisTurn += card.surge;
+      pushLog(game, `몰아치기 +${card.surge} (총 ${game.momentumSpentThisTurn}).`);
     }
     if (card.bossWeaken) {
       game.bossWeakenActive = true;

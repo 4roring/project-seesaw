@@ -22,6 +22,10 @@ const TS_DATA = {
   // 파훼는 원래 "적 페이즈 취소 + 다음 페이즈까지 기절 + 사혈 노출"로
   // 페이즈를 두 개 지웠다. 최적 플레이가 파훼를 노릴수록 압도적이 되는
   // 원인이라 요소별로 켜고 끌 수 있게 뺐다.
+  // 클로저(페이즈를 끝내는 마무리 일격)가 인정하는 방어도 비율.
+  // 0이면 방어도를 통째로 무시한다. 0.5면 절반만 막힌다 (gdd/08 8-4-2).
+  CLOSER_BLOCK_RATIO: 0,
+
   BREAK_STUNS_NEXT_PHASE: true,  // 다음 페이즈까지 통째로 지울 것인가
   BREAK_GRANTS_VULNERABLE: true, // 다음 합 사혈 노출(+50%)을 줄 것인가
   BREAK_BUDGET_RATIO: null,      // null이면 페이즈 취소. 0.5면 예산 절반으로 진행
@@ -114,6 +118,9 @@ const TS_DATA = {
         { key: 'rapid_slash', name: '낙매분분', cost: 1, damage: 4, block: 0, chain: 3 },
         { key: 'counter_rage', name: '노화반격', cost: 2, damage: 8, block: 6 },
         { key: 'chain_wall', name: '매화방신', cost: 1, damage: 0, block: 2, chainBlock: 4 },
+        // B라인(일격) — 연계가 "나중에 낼수록 강함"이면 이쪽은 "먼저 낼수록 강함"
+        { key: 'draw_blade', name: '발도세', cost: 1, damage: 2, block: 0, deepStrike: 2 },
+        { key: 'thunder_flash', name: '벽력일섬', cost: 2, damage: 4, block: 0, deepStrike: 3 },
         { key: 'flame_edge', name: '화룡수', cost: 2, damage: 11, block: 0 },
         { key: 'ignite', name: '발화결', cost: 1, damage: 4, block: 0, effect: 'REDUCE_NEXT_COST' },
         { key: 'double_load', name: '쌍수결', cost: 2, damage: 6, block: 0, draw: 1 },
@@ -125,6 +132,8 @@ const TS_DATA = {
         { key: 'flame_combo', name: '화염연격', cost: 3, damage: 20, block: 0 },
         { key: 'chain_storm', name: '연환폭풍', cost: 3, damage: 8, block: 0, chain: 5 },
         { key: 'heat_vent', name: '열기토납', cost: 2, damage: 9, block: 0, chainBlock: 4 },
+        { key: 'sky_fall', name: '천붕일격', cost: 3, damage: 6, block: 0, deepStrike: 5 },
+        { key: 'primal_stance', name: '혼원일기', cost: 2, damage: 0, block: 4, deepStrike: 4 },
       ],
       3: [
         { key: 'ultimate_core', name: '심법: 화경운기', cost: 4, damage: 0, block: 0, effect: 'PERSISTENT_DAMAGE_BOOST', persistentPayload: { id: 'aura-damage-boost', name: '화경운기', amount: 6, turns: 4 } },
@@ -135,6 +144,8 @@ const TS_DATA = {
         { key: 'final_chain', name: '매화천강', cost: 4, damage: 12, block: 0, chain: 8 },
         { key: 'blaze_dance', name: '열화난무', cost: 3, damage: 6, block: 0, chain: 7, draw: 1 },
         { key: 'heat_armor', name: '화갑호신', cost: 3, damage: 8, block: 10, chainBlock: 6 },
+        { key: 'heaven_rend', name: '개천벽력', cost: 5, damage: 12, block: 0, deepStrike: 8 },
+        { key: 'world_split', name: '천지개벽', cost: 4, damage: 8, block: 0, deepStrike: 7 },
       ],
     },
     BLUE: {
@@ -145,6 +156,9 @@ const TS_DATA = {
         { key: 'calc_boost', name: '청심결', cost: 2, damage: 8, block: 0, draw: 1 },
         { key: 'delay_loop', name: '완류세', cost: 3, damage: 0, block: 8, rewind: 1 },
         { key: 'cloud_step', name: '제운종', cost: 2, damage: 0, block: 0, evade: 1, draw: 1 },
+        // B라인(점혈) — 적의 행동 자체를 자원으로 쓴다
+        { key: 'meridian_cut', name: '기맥 차단', cost: 1, damage: 0, block: 0, drainPower: 2 },
+        { key: 'point_strike', name: '점혈수법', cost: 2, damage: 5, block: 0, sealSkill: 2 },
       ],
       2: [
         { key: 'datastream', name: '유수연환', cost: 2, damage: 10, block: 0, draw: 2 },
@@ -155,6 +169,8 @@ const TS_DATA = {
         { key: 'logic_bomb', name: '태극붕권', cost: 3, damage: 14, block: 8 },
         { key: 'defrag', name: '조식정기', cost: 3, damage: 0, block: 0, draw: 2, rewind: 1 },
         { key: 'redirect', name: '이화접목', cost: 2, damage: 0, block: 0, evade: 2 },
+        { key: 'vital_lock', name: '사혈 제압', cost: 3, damage: 10, block: 0, sealSkill: 3 },
+        { key: 'siphon_qi', name: '흡정공', cost: 2, damage: 6, block: 0, drainPower: 3 },
       ],
       3: [
         { key: 'overflow', name: '창해노도', cost: 4, damage: 31, block: 0, draw: 2 },
@@ -166,6 +182,8 @@ const TS_DATA = {
         { key: 'deep_calc', name: '현천심법', cost: 5, damage: 34, block: 0, draw: 2, rewind: 1 },
         { key: 'firewall', name: '현무방벽', cost: 2, damage: 0, block: 18, draw: 1 },
         { key: 'taiji_step', name: '태극신법', cost: 3, damage: 0, block: 0, evade: 3, draw: 2 },
+        { key: 'seal_meridian', name: '폐맥대법', cost: 4, damage: 14, block: 0, sealSkill: 4, drainPower: 3 },
+        { key: 'heaven_net', name: '천라지망', cost: 3, damage: 0, block: 0, sealSkill: 3, evade: 1 },
       ],
     },
     BLACK: {
@@ -174,6 +192,9 @@ const TS_DATA = {
         { key: 'shield_bash', name: '강기충', cost: 2, damage: 0, block: 0, blockToDamage: 1 },
         { key: 'counter_stance', name: '반탄세', cost: 1, damage: 0, block: 4, counter: 5 },
         { key: 'check_strike', name: '항마장', cost: 2, damage: 8, block: 4 },
+        // B라인(파훼) — 초식이 무거워 몰아치기가 안 쌓이던 문제를 푸는 부품
+        { key: 'kihap', name: '기합', cost: 1, damage: 0, block: 0, surge: 2 },
+        { key: 'vajra_fist', name: '금강권', cost: 2, damage: 8, block: 0, surge: 1 },
       ],
       2: [
         { key: 'heavyarmor', name: '중갑호신', cost: 2, damage: 0, block: 12 },
@@ -181,6 +202,8 @@ const TS_DATA = {
         { key: 'barrier', name: '진법: 나한진', cost: 3, damage: 0, block: 0, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '나한진', amount: 5, turns: 3 } },
         { key: 'steel_counter', name: '금강반탄', cost: 3, damage: 19, block: 8, counter: 6 },
         { key: 'rampart_strike', name: '벽력금강', cost: 3, damage: 5, block: 6, blockToDamage: 1 },
+        { key: 'lion_roar', name: '사자후', cost: 2, damage: 0, block: 6, surge: 3 },
+        { key: 'break_palm', name: '파계장', cost: 3, damage: 10, block: 0, breakThresholdDown: 2 },
       ],
       3: [
         { key: 'absolute_guard', name: '부동명왕', cost: 3, damage: 0, block: 20 },
@@ -189,6 +212,8 @@ const TS_DATA = {
         { key: 'fortress', name: '철옹금성', cost: 4, damage: 0, block: 26, counter: 10 },
         { key: 'crush', name: '항마멸쇄', cost: 6, damage: 47, block: 8 },
         { key: 'absolute_reflect', name: '만법귀일', cost: 4, damage: 10, block: 12, blockToDamage: 1 },
+        { key: 'demon_ward', name: '항마대진', cost: 4, damage: 0, block: 12, surge: 5 },
+        { key: 'devil_slay', name: '멸마일격', cost: 5, damage: 20, block: 0, surge: 4 },
       ],
     },
     YELLOW: {
@@ -197,6 +222,9 @@ const TS_DATA = {
         { key: 'life_cycle', name: '순환결', cost: 1, damage: 0, block: 0, heal: 6, draw: 1 },
         { key: 'endure', name: '인고결', cost: 2, damage: 10, block: 0, hpCost: 3 },
         { key: 'purify', name: '청혈결', cost: 1, damage: 0, block: 0, heal: 4, bossWeaken: true },
+        // B라인(광기) — 흡성(되메우기)과 정반대로 HP를 낮게 유지할수록 강하다
+        { key: 'blood_slash', name: '혈광참', cost: 1, damage: 3, block: 0, rageScale: 3 },
+        { key: 'self_rend', name: '자해공', cost: 1, damage: 4, block: 0, hpCost: 6, rageScale: 2 },
       ],
       2: [
         { key: 'devotion', name: '사혈지법', cost: 2, damage: 13, block: 0, hpCost: 4 },
@@ -204,6 +232,8 @@ const TS_DATA = {
         { key: 'decay_spread', name: '진법: 부패진', cost: 2, damage: 13, block: 0, effect: 'PERSISTENT_BOSS_VULNERABLE', persistentPayload: { id: 'aura-boss-vulnerable', name: '부패진', amount: 15, turns: 2 } },
         { key: 'blood_pact', name: '혈계지약', cost: 3, damage: 20, block: 0, hpCost: 5 },
         { key: 'drain_wave', name: '흡성파', cost: 3, damage: 16, block: 0, lifesteal: 35 },
+        { key: 'mad_dance', name: '광혈무', cost: 2, damage: 6, block: 0, rageScale: 5 },
+        { key: 'qi_deviation', name: '마기폭주', cost: 2, damage: 4, block: 0, hpCost: 8, rageScale: 6 },
       ],
       3: [
         { key: 'sacrifice', name: '사혈일격', cost: 3, damage: 24, block: 0, hpCost: 8 },
@@ -212,6 +242,8 @@ const TS_DATA = {
         { key: 'life_convert', name: '환혈전공', cost: 4, damage: 31, block: 0, heal: 5 },
         { key: 'final_awakening', name: '마혼각성', cost: 6, damage: 48, block: 0, hpCost: 10 },
         { key: 'great_drain', name: '흡성신공', cost: 5, damage: 36, block: 0, lifesteal: 35 },
+        { key: 'blood_sea', name: '혈해마공', cost: 4, damage: 14, block: 0, rageScale: 9 },
+        { key: 'annihilation', name: '멸절심공', cost: 5, damage: 20, block: 0, rageScale: 12 },
       ],
     },
   },
@@ -223,6 +255,10 @@ const TS_DATA = {
     rapid_slash: { chain: 6 }, brace: { chainBlock: 6 }, flame_edge: { damage: 15 },
     ignite: { damage: 7 }, double_load: { damage: 9 }, counter_rage: { damage: 11 },
     chain_wall: { chainBlock: 8 },
+    draw_blade: { deepStrike: 3 }, thunder_flash: { deepStrike: 5 },
+    meridian_cut: { drainPower: 3 }, point_strike: { sealSkill: 3 },
+    kihap: { surge: 3 }, vajra_fist: { damage: 11 },
+    blood_slash: { rageScale: 5 }, self_rend: { rageScale: 4 },
     jab: { damage: 7 }, tuneup: { draw: 2 }, rewind: { rewind: 3 },
     datashard: { damage: 9 }, parallel_scan: { draw: 3 }, backup_circuit: { block: 9 },
     calc_boost: { damage: 11 }, delay_loop: { block: 12 },
