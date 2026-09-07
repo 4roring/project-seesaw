@@ -65,4 +65,5 @@
 | [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리 |
 | [011-weapons-slots.md](011-weapons-slots.md) | ⏸ 보류 | 무기 = 색과 곱해지는 둘째 축. 슬롯 2칸 · 이기어검 · 심검. [001](001-artifact-system.md)과 한 몸 |
 | [012-node-map.md](012-node-map.md) | ⏸ 보류 | 스테이지마다 3지선다 — 비무 · 수련장 · 주루 · 문파 방문 · 기연. 009의 콘텐츠 공급원 |
+| [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
 | [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |
