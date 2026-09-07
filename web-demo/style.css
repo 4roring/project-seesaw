@@ -348,3 +348,25 @@ button:hover { border-color: var(--text-dim); }
 .surge-hint { opacity: 0.6; font-size: 11px; }
 .surge-meter.ready { background: rgba(226, 87, 76, 0.18); }
 .surge-meter.ready .surge-hint { opacity: 0.95; color: #ffb3ad; }
+
+/* 강화 선택 — 설명과 함께 무엇이 어떻게 강해지는지 (text.js가 생성) */
+.upgrade-chip {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.upgrade-chip:hover { background: rgba(201, 162, 39, 0.16); border-color: #c9a227; }
+.uc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.uc-name { font-weight: 600; }
+.uc-cost { font-size: 11px; opacity: 0.7; white-space: nowrap; }
+.uc-desc { font-size: 12px; opacity: 0.8; line-height: 1.45; }
+.uc-diff { display: flex; flex-wrap: wrap; gap: 6px; }
+.uc-row {
+  font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: rgba(201, 162, 39, 0.18); color: #f0d98a;
+  font-variant-numeric: tabular-nums;
+}
+.uc-row b { font-weight: 600; opacity: 0.85; margin-right: 3px; }
+.uc-row i { font-style: normal; opacity: 0.65; margin: 0 2px; }

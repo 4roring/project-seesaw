@@ -225,7 +225,7 @@ const TS_UI = (() => {
       div.innerHTML = `
         <div class="card-cost">${card.cost}</div>
         <div class="card-name">${card.name}</div>
-        <div class="card-desc">${hpTag}${card.desc}</div>`;
+        <div class="card-desc">${TS_Text.describe(card)}</div>`;
       div.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', card.uid);
         div.classList.add('dragging');
@@ -329,11 +329,10 @@ const TS_UI = (() => {
     run.rewardOptions.forEach((opt) => {
       const div = document.createElement('div');
       div.className = 'reward-card';
-      const hpTag = opt.hpCost ? `HP -${opt.hpCost} · ` : '';
       div.innerHTML = `
         <div class="rc-name">${opt.name}</div>
         <div class="rc-cost">틈 ${opt.cost}</div>
-        <div class="rc-desc">${hpTag}${opt.desc}</div>`;
+        <div class="rc-desc">${TS_Text.describe(opt)}</div>`;
       div.addEventListener('click', () => { TS_Run.takeCard(opt); resetBattleFx(); render(); });
       els['reward-grid'].appendChild(div);
     });
@@ -352,9 +351,16 @@ const TS_UI = (() => {
         const card = run.deck[i];
         if (shown.has(card.key)) return;
         shown.add(card.key);
+        const diff = TS_Text.upgradeDiff(card);
+        const upgraded = { ...card, ...(D.UPGRADES[card.key] || {}) };
         const chip = document.createElement('div');
         chip.className = 'upgrade-chip';
-        chip.textContent = `${card.name} → +`;
+        chip.innerHTML = `
+          <div class="uc-head"><span class="uc-name">${card.name} → ${card.name}+</span>`
+          + `<span class="uc-cost">틈 ${card.cost}</span></div>
+          <div class="uc-desc">${TS_Text.describe(upgraded)}</div>
+          <div class="uc-diff">${diff.map((d) =>
+              `<span class="uc-row"><b>${d.label}</b> ${d.from} <i>→</i> ${d.to}</span>`).join('')}</div>`;
         chip.addEventListener('click', () => { TS_Run.applyUpgrade(i); resetBattleFx(); render(); });
         els['upgrade-grid'].appendChild(chip);
       });

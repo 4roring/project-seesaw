@@ -127,24 +127,11 @@ const TS_Run = (() => {
     const card = state.deck[index];
     const patch = D.UPGRADES[card.key];
     if (!card || card.upgraded || !patch) return false;
-    state.deck[index] = { ...card, ...patch, upgraded: true, name: `${card.name}+`, desc: describeUpgrade(card, patch) };
+    // 설명은 web-demo/text.js가 필드에서 생성하므로 여기서 만들지 않는다 —
+    // 손으로 만들던 시절엔 강화하면 원래 효과가 텍스트에서 사라졌다.
+    state.deck[index] = { ...card, ...patch, upgraded: true, name: `${card.name}+` };
     afterReward();
     return true;
-  }
-
-  function describeUpgrade(card, patch) {
-    const parts = [];
-    if (patch.damage) parts.push(`피해 ${patch.damage}`);
-    if (patch.block) parts.push(`방어도 ${patch.block}`);
-    if (patch.heal) parts.push(`회복 ${patch.heal}`);
-    if (patch.draw) parts.push(`드로우 ${patch.draw}`);
-    if (patch.rewind) parts.push(`되감기 ${patch.rewind}`);
-    if (patch.counter) parts.push(`반격 ${patch.counter}`);
-    if (patch.breakThresholdDown) parts.push(`파훼 임계점 -${patch.breakThresholdDown}`);
-    if (patch.chain) parts.push(`연계 피해 ${patch.chain}`);
-    if (patch.chainBlock) parts.push(`연계 방어도 ${patch.chainBlock}`);
-    if (patch.lifesteal) parts.push(`흡혈 ${patch.lifesteal}%`);
-    return parts.length ? `${parts.join(', ')} (강화)` : `${card.desc} (강화)`;
   }
 
   function takeCard(option) {
