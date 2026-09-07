@@ -15,14 +15,16 @@ const TS_UI = (() => {
       'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'intent-preview', 'boss-skill-legend',
       'surge-meter',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
-      'reward-title', 'reward-sub', 'reward-grid', 'upgrade-grid', 'skip-reward-btn',
+      'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
+      'screen-crossroad', 'crossroad-sub', 'crossroad-grid',
+      'screen-node', 'node-title', 'node-sub', 'node-body', 'node-echo',
       'result-title', 'result-sub', 'result-restart-btn',
     ].forEach((id) => { els[id] = $(id); });
   }
 
   // ── 화면 전환 ───────────────────────────────────────────────
   function showScreen(name) {
-    ['select', 'battle', 'reward', 'result'].forEach((s) => {
+    ['select', 'battle', 'reward', 'crossroad', 'node', 'result'].forEach((s) => {
       els[`screen-${s}`].classList.toggle('hidden', s !== name);
     });
   }
@@ -32,6 +34,8 @@ const TS_UI = (() => {
     if (run.phase === 'SELECT') { showScreen('select'); renderDeckSelect(); return; }
     if (run.phase === 'BATTLE') { showScreen('battle'); renderBattle(run); return; }
     if (run.phase === 'REWARD') { showScreen('reward'); renderReward(run); return; }
+    if (run.phase === 'CROSSROAD') { showScreen('crossroad'); renderCrossroad(run); return; }
+    if (run.phase === 'NODE') { showScreen('node'); renderNode(run); return; }
     showScreen('result'); renderResult(run);
   }
 
@@ -162,9 +166,14 @@ const TS_UI = (() => {
     const g = run.game;
     const color = D.COLORS[run.color];
 
-    els['stage-badge'].textContent = `STAGE ${run.stage}`;
+    els['stage-badge'].textContent = run.battleKind === 'ELITE'
+      ? '비무대회' : `STAGE ${run.stage}`;
     els['stage-name'].textContent = g.enemyRealm
       ? `${g.enemyName} · ${g.enemyRealm}` : g.enemyName;
+    // 직전 걸음에서 무슨 일이 있었는지 한 줄로 남긴다 — 걸음의 결과를
+    // 별도 화면으로 띄우면 클릭만 하나 늘고 읽히지는 않는다.
+    els['node-echo'].textContent = run.nodeResult || '';
+    els['node-echo'].classList.toggle('hidden', !run.nodeResult);
     els['turn-count'].textContent = g.turn;
 
     els['player-avatar'].textContent = color.icon;
@@ -393,11 +402,21 @@ const TS_UI = (() => {
     setTimeout(() => div.remove(), 800);
   }
 
-  // ── 보상 ────────────────────────────────────────────────────
+  // ── 비무 전리품 ─────────────────────────────────────────────
+  // 강화는 여기 없다 — 수련장 걸음으로 옮겼다 (gdd/13 13-3). 전리품과
+  // 수련은 성격이 다른 보상인데 한 화면에서 다투게 두면, 둘 중 하나는
+  // 늘 고르지 않는 쪽이 된다.
   function renderReward(run) {
-    els['reward-title'].textContent = `스테이지 ${run.stage} 클리어!`;
+    const elite = run.battleKind === 'ELITE';
+    els['reward-title'].textContent = elite
+      ? '비무대회 우승!'
+      : `스테이지 ${run.stage} 클리어!`;
+    const next = D.ENEMIES[run.stage] ? D.ENEMIES[run.stage].name : '—';
     els['reward-sub'].textContent =
-      `현재 덱 ${run.deck.length}장 · 다음 상대: ${D.ENEMIES[run.stage].name} (다음 전투 전 잃은 체력의 ${Math.round(D.STAGE_HEAL_RATIO * 100)}% 회복)`;
+      `현재 덱 ${run.deck.length}장 · 체력 ${run.playerHp}/${run.playerMaxHp} · 다음 상대: ${next}`;
+    els['reward-heading'].textContent = run.rewardPicksLeft > 1
+      ? `전리품 — 초식 ${run.rewardPicksLeft}장을 거둡니다`
+      : '전리품 — 초식 하나를 거둡니다';
 
     els['reward-grid'].innerHTML = '';
     run.rewardOptions.forEach((opt) => {
@@ -410,35 +429,134 @@ const TS_UI = (() => {
       div.addEventListener('click', () => { TS_Run.takeCard(opt); resetBattleFx(); render(); });
       els['reward-grid'].appendChild(div);
     });
+  }
 
-    els['upgrade-grid'].innerHTML = '';
-    const idxs = TS_Run.upgradableIndexes();
-    if (idxs.length === 0) {
-      const note = document.createElement('div');
-      note.className = 'empty-note';
-      note.textContent = '강화할 수 있는 카드가 없습니다.';
-      els['upgrade-grid'].appendChild(note);
-    } else {
-      // 같은 카드가 여러 장이면 하나만 대표로 보여준다
-      const shown = new Set();
-      idxs.forEach((i) => {
-        const card = run.deck[i];
-        if (shown.has(card.key)) return;
-        shown.add(card.key);
-        const diff = TS_Text.upgradeDiff(card);
-        const upgraded = { ...card, ...(D.UPGRADES[card.key] || {}) };
-        const chip = document.createElement('div');
-        chip.className = 'upgrade-chip';
-        chip.innerHTML = `
-          <div class="uc-head"><span class="uc-name">${card.name} → ${card.name}+</span>`
-          + `<span class="uc-cost">틈 ${card.cost}</span></div>
-          <div class="uc-desc">${TS_Text.describe(upgraded)}</div>
-          <div class="uc-diff">${diff.map((d) =>
-              `<span class="uc-row"><b>${d.label}</b> ${d.from} <i>→</i> ${d.to}</span>`).join('')}</div>`;
-        chip.addEventListener('click', () => { TS_Run.applyUpgrade(i); resetBattleFx(); render(); });
-        els['upgrade-grid'].appendChild(chip);
-      });
+  // ── 갈림길 ──────────────────────────────────────────────────
+  function renderCrossroad(run) {
+    els['crossroad-sub'].textContent =
+      `체력 ${run.playerHp}/${run.playerMaxHp} · 덱 ${run.deck.length}장 · `
+      + `다음 상대는 ${D.ENEMIES[run.stage].name}. 어느 걸음을 디딜 것인가.`;
+
+    // 주루에서 들은 소문 — 앞 상대의 빈틈과 성격. 이 게임에서 가장 값진
+    // 정보라, 걸음을 고르기 전에 보이지 않으면 팔 물건이 못 된다.
+    els['crossroad-grid'].innerHTML = '';
+    const intel = (run.intel || []).filter((st) => st >= run.stage + 1 && st <= D.ENEMIES.length);
+    if (intel.length) {
+      const strip = document.createElement('div');
+      strip.className = 'intel-strip';
+      strip.innerHTML = '<span class="intel-label">들은 소문</span>' + intel.map((st) => {
+        const e = D.ENEMIES[st - 1];
+        const style = e.closerStyle === 'CRAFTY' ? '노회' : '패도';
+        return `<span class="intel-item"><b>${st}단계 ${e.name}</b> — 빈틈 ${e.breakThreshold} · ${style}</span>`;
+      }).join('');
+      els['crossroad-grid'].appendChild(strip);
     }
+    run.crossroad.forEach((key) => {
+      const def = D.NODES[key];
+      const div = document.createElement('div');
+      div.className = `crossroad-card node-${key.toLowerCase()}`;
+      div.innerHTML = `
+        <div class="cr-icon">${def.icon}</div>
+        <div class="cr-name">${def.name}</div>
+        <div class="cr-blurb">${def.blurb}</div>
+        <div class="cr-detail">${crossroadDetail(run, key)}</div>`;
+      div.addEventListener('click', () => { TS_Run.chooseNode(key); resetBattleFx(); render(); });
+      els['crossroad-grid'].appendChild(div);
+    });
+  }
+
+  // 걸음마다 "지금 고르면 실제로 얼마인가"를 붙인다. 이름만 보고 고르면
+  // 3지선다가 분위기 선택이 되고, 포기한 것이 무엇인지 남지 않는다.
+  function crossroadDetail(run, key) {
+    const missing = run.playerMaxHp - run.playerHp;
+    if (key === 'TRAINING') {
+      return `운기조식 +${Math.floor(missing * D.TRAIN_HEAL_RATIO)} · 또는 초식 연마 1회`;
+    }
+    if (key === 'TAVERN') {
+      const names = [];
+      for (let i = 0; i < D.TAVERN_INTEL_DEPTH; i++) {
+        const st = run.stage + 1 + i;
+        if (st <= D.ENEMIES.length) names.push(`${st}단계`);
+      }
+      return `${names.join('·') || '—'}의 빈틈을 미리 안다 · 회복 +${Math.floor(missing * D.TAVERN_HEAL_RATIO)}`;
+    }
+    if (key === 'SECT_VISIT') {
+      return `초식 하나를 놓고 하나를 배웁니다 — 자기 문파 ${D.SECT_VISIT_OWN_CHOICES}장, 타 문파 ${D.SECT_VISIT_FOREIGN_CHOICES}장 중에서`;
+    }
+    if (key === 'ELITE') {
+      const idx = Math.min(run.stage - 1 + D.ELITE_LOOKAHEAD, D.ENEMIES.length - 1);
+      const e = D.ENEMIES[idx];
+      return `상대: ${e.name} (체력 ${Math.round(e.hp * D.ELITE_HP_RATIO)}, 빈틈 ${e.breakThreshold}) · 이기면 초식 ${D.ELITE_REWARD_CARDS}장`;
+    }
+    if (key === 'FORTUNE') {
+      const left = D.FORTUNE_MAX_PER_RUN - run.fortuneUsed;
+      return `대가 없는 기연은 없습니다 · 이번 강호행에 ${left}번 남음`;
+    }
+    return '';
+  }
+
+  // ── 걸음 안의 선택 ──────────────────────────────────────────
+  function renderNode(run) {
+    const view = run.nodeView || { title: '', sub: '', options: [] };
+    els['node-title'].textContent = view.title;
+    els['node-sub'].textContent = view.sub;
+    els['node-body'].innerHTML = '';
+
+    const groups = view.groups
+      || [{ label: null, ids: (view.options || []).map((o) => o.id) }];
+
+    groups.forEach((g) => {
+      if (g.label) {
+        const h = document.createElement('h3');
+        h.className = 'reward-heading';
+        h.textContent = g.label;
+        els['node-body'].appendChild(h);
+      }
+      const grid = document.createElement('div');
+      grid.className = 'node-grid';
+      g.ids.forEach((id) => {
+        const opt = view.options.find((o) => o.id === id);
+        if (!opt) return;
+        grid.appendChild(nodeOptionEl(run, opt));
+      });
+      els['node-body'].appendChild(grid);
+    });
+  }
+
+  function nodeOptionEl(run, opt) {
+    const div = document.createElement('div');
+    div.className = 'node-option' + (opt.disabled ? ' disabled' : '');
+
+    if (opt.card) {
+      div.innerHTML = `
+        <div class="no-head"><span class="no-name">${opt.card.name}</span>`
+        + `<span class="no-tag">${opt.tag || ''}</span></div>
+        <div class="no-cost">틈 ${opt.card.cost}</div>
+        <div class="no-desc">${TS_Text.describe(opt.card)}</div>`;
+    } else if (opt.upgrade) {
+      // 강화는 "무엇이 어떻게 세지는가"를 둘 다 보여준다 — 강화 후 전문과
+      // 필드별 차이를 함께 띄우지 않으면 무엇을 고르는지 알 수 없다.
+      const card = run.deck[opt.cardIndex];
+      const upgraded = { ...card, ...(D.UPGRADES[card.key] || {}) };
+      const diff = TS_Text.upgradeDiff(card);
+      div.innerHTML = `
+        <div class="no-head"><span class="no-name">${card.name} → ${card.name}+</span>`
+        + `<span class="no-tag">${opt.tag || ''}</span></div>
+        <div class="no-cost">틈 ${card.cost}</div>
+        <div class="no-desc">${TS_Text.describe(upgraded)}</div>
+        <div class="uc-diff">${diff.map((d) =>
+            `<span class="uc-row"><b>${d.label}</b> ${d.from} <i>→</i> ${d.to}</span>`).join('')}</div>`;
+    } else {
+      div.innerHTML = `
+        <div class="no-head"><span class="no-name">${opt.name}</span>`
+        + `<span class="no-tag">${opt.tag || ''}</span></div>
+        <div class="no-desc">${(opt.desc || '').replace(/\n/g, '<br>')}</div>`;
+    }
+
+    if (!opt.disabled) {
+      div.addEventListener('click', () => { TS_Run.chooseNodeOption(opt.id); resetBattleFx(); render(); });
+    }
+    return div;
   }
 
   function resetBattleFx() { fxCursor = TS_Run.get().game ? TS_Run.get().game.fx.length : 0; }

@@ -22,6 +22,7 @@
         <div class="stage-info">
           <span class="stage-badge" id="stage-badge">STAGE 1</span>
           <span class="stage-name" id="stage-name"></span>
+          <span class="node-echo" id="node-echo"></span>
         </div>
         <div class="header-right">
           <span class="turn-info"><span id="turn-count">1</span>합</span>
@@ -89,17 +90,29 @@
       <section class="panel log-panel" id="log-panel"></section>
     </section>
 
-    <!-- ── 보상 ─────────────────────────────────────────────── -->
+    <!-- ── 비무 전리품 ──────────────────────────────────────── -->
     <section class="screen hidden" id="screen-reward">
       <h2 class="title" id="reward-title">스테이지 클리어</h2>
       <p class="subtitle" id="reward-sub"></p>
-      <h3 class="reward-heading">새 카드 획득 (덱 +1장)</h3>
+      <h3 class="reward-heading" id="reward-heading">전리품 — 초식 하나를 거둡니다</h3>
       <div class="reward-grid" id="reward-grid"></div>
-      <h3 class="reward-heading">또는 카드 강화 (덱 장수 유지)</h3>
-      <div class="upgrade-grid" id="upgrade-grid"></div>
       <div class="reward-actions">
-        <button id="skip-reward-btn" class="ghost-btn">둘 다 건너뛰기</button>
+        <button id="skip-reward-btn" class="ghost-btn">거두지 않는다</button>
       </div>
+    </section>
+
+    <!-- ── 갈림길 ───────────────────────────────────────────── -->
+    <section class="screen hidden" id="screen-crossroad">
+      <h2 class="title">갈림길</h2>
+      <p class="subtitle" id="crossroad-sub"></p>
+      <div class="crossroad-grid" id="crossroad-grid"></div>
+    </section>
+
+    <!-- ── 걸음 안의 선택 ───────────────────────────────────── -->
+    <section class="screen hidden" id="screen-node">
+      <h2 class="title" id="node-title">걸음</h2>
+      <p class="subtitle" id="node-sub"></p>
+      <div class="node-body" id="node-body"></div>
     </section>
 
     <!-- ── 런 종료 ──────────────────────────────────────────── -->

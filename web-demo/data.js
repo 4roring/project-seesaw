@@ -31,8 +31,37 @@ const TS_DATA = {
   BREAK_BUDGET_RATIO: null,      // null이면 페이즈 취소. 0.5면 예산 절반으로 진행
 
   MIN_MOMENTUM_RETURN: 3, // 적 페이즈가 끝날 때 보장되는 최소 기세(아3)
-  STAGE_HEAL_RATIO: 0.5, // 스테이지 클리어 후 잃은 체력의 50% 회복 (gdd 09 문서 9-4)
   REWARD_CHOICES: 3, // 보상으로 제시되는 카드 장수
+
+  // ─────────────────────────────────────────────────────────────
+  // 갈림길 (gdd/13-crossroads.md) — 비무와 비무 사이의 한 걸음.
+  //
+  // 회복이 세 군데로 쪼개졌다. 예전에는 스테이지마다 잃은 체력의 50%가
+  // 그냥 돌아왔는데, 그러면 수련장의 운기조식이 살 이유가 없다. 기본
+  // 회복을 깎고 그만큼을 걸음에 실어, "쉬러 갈 것인가"가 실제 선택이
+  // 되게 한다.
+  // ─────────────────────────────────────────────────────────────
+  STAGE_HEAL_RATIO: 0.4,   // 어느 걸음을 골라도 붙는 기본 회복
+  TRAIN_HEAL_RATIO: 0.5,   // 수련장 · 운기조식
+  TAVERN_HEAL_RATIO: 0.2,  // 주루 — 회복은 덤이고 본체는 정보다
+  // 갈림길을 꺼서 "걸음이 없던 시절"과 직접 비교하기 위한 개발용 스위치.
+  // 걸음이 밸런스에 얼마를 보태는지는 이 A/B로만 정확히 갈린다.
+  CROSSROAD_ENABLED: true,
+  CROSSROAD_CHOICES: 3,
+  // 수련장을 갈림길에 늘 끼울 것인가. 예전에는 스테이지마다 강화를 고를 수
+  // 있었는데, 강화를 걸음으로 옮기면서 닿는 빈도가 5분의 1로 줄었다.
+  CROSSROAD_ALWAYS_TRAINING: true,
+  SECT_VISIT_OWN_CHOICES: 5,     // 비급 열람 — 보상(3장)보다 넓게 본다
+  SECT_VISIT_FOREIGN_CHOICES: 3, // 객경 초빙 — 타 문파 무공
+  FORTUNE_MAX_PER_RUN: 2,  // 기연이 잦으면 우연이 아니라 일과가 된다
+  TAVERN_INTEL_DEPTH: 2,   // 주루에서 미리 보는 앞 스테이지 수
+
+  // 비무대회 — 앞으로 만날 상대를 미리 겨룬다. 적 데이터를 새로 만들지
+  // 않는 이유: 이미 균형이 잡힌 로스터를 당겨 쓰면 난이도가 스테이지
+  // 곡선을 따라 저절로 올라간다.
+  ELITE_LOOKAHEAD: 2,      // 몇 스테이지 앞의 상대를 당겨오는가
+  ELITE_HP_RATIO: 0.8,     // 그 상대의 체력 비율
+  ELITE_REWARD_CARDS: 2,   // 이기면 초식 두 장
 
   // ─────────────────────────────────────────────────────────────
   // 카드 효과 필드 (gdd/05-mvp-spec.md 5-1)
@@ -401,4 +430,100 @@ const TS_DATA = {
       ],
     },
   ],
+
+  // ─────────────────────────────────────────────────────────────
+  // 걸음의 종류 (gdd/13-crossroads.md 13-2)
+  //
+  // needsChoice가 true면 걸음을 고른 뒤 한 번 더 고른다. 그래야 "수련장에
+  // 갔다"가 "쉴 것인가 연마할 것인가"라는 두 번째 결정을 낳는다.
+  // ─────────────────────────────────────────────────────────────
+  NODES: {
+    TRAINING: {
+      key: 'TRAINING', name: '수련장(修練場)', icon: '⛩',
+      blurb: '운기조식으로 숨을 돌리거나, 익힌 초식을 연마한다.',
+      needsChoice: true,
+    },
+    TAVERN: {
+      key: 'TAVERN', name: '주루(酒樓)', icon: '🍶',
+      blurb: '앞길의 소문을 듣는다 — 다음 상대들의 빈틈과 성격. 잠시 쉬어간다.',
+      needsChoice: false,
+    },
+    SECT_VISIT: {
+      key: 'SECT_VISIT', name: '문파 방문', icon: '🏯',
+      blurb: '익힌 초식 하나를 놓고, 본산의 비급이나 타 문파의 무공을 하나 배운다.',
+      needsChoice: true,
+    },
+    FORTUNE: {
+      key: 'FORTUNE', name: '기연(奇緣)', icon: '✨',
+      blurb: '무엇이 기다리는지는 닿아 보아야 안다.',
+      needsChoice: true,
+    },
+    ELITE: {
+      key: 'ELITE', name: '비무대회(比武大會)', icon: '⚔',
+      blurb: '앞길에서 만날 고수와 미리 겨룬다. 이기면 크게 얻고, 지면 여기서 끝난다.',
+      needsChoice: false,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // 기연 (gdd/13-crossroads.md 13-5)
+  //
+  // 무협의 기연에는 언제나 대가가 붙는다. 대가 없는 기연은 그냥 무작위
+  // 파워업이고, 그러면 "기연을 고를까"가 고민이 아니라 정답이 된다.
+  // cost가 이 게임의 고유 축(최소 반환 기세 · 최대 체력 · 덱)을 건드리는
+  // 쪽을 고른 이유는, HP나 확률로 지불하면 다른 규칙과 다른 언어가 되기
+  // 때문이다.
+  // ─────────────────────────────────────────────────────────────
+  FORTUNES: [
+    {
+      key: 'elixir', name: '영약(靈藥)', icon: '🍵',
+      story: '동굴 안쪽에 이름 모를 열매가 익어 있습니다. 기운은 웅혼하나 탁합니다.',
+      gain: '최대 체력 +15 (즉시 그만큼 회복)',
+      cost: '남은 강호행 내내 최소 반환 기세가 1 얕아집니다',
+      apply: (run) => { run.playerMaxHp += 15; run.playerHp += 15; run.minReturn -= 1; },
+      // 최소 반환은 1 이상을 지켜야 한다 — 0이면 합이 시작되지 않는다
+      available: (run) => run.minReturn > 1,
+    },
+    {
+      key: 'manual', name: '비급(祕笈)', icon: '📜',
+      story: '무너진 서고에서 낡은 책자를 주웠습니다. 구결은 읽히나 몸이 따라주지 않습니다.',
+      gain: '색 밖의 초식 한 자락 — 다만 구결뿐입니다',
+      cost: '다음 수련장에서 한 걸음을 들여야 익혀집니다',
+      apply: (run) => { run.pendingManual = true; },
+      available: (run) => !run.pendingManual,
+    },
+    {
+      key: 'demonic', name: '마공(魔功)', icon: '🩸',
+      story: '핏자국이 마르지 않은 석벽에 초식 하나가 새겨져 있습니다. 익히면 되돌릴 수 없습니다.',
+      gain: '금기의 초식 1장을 즉시 익힙니다',
+      cost: '최대 체력 10을 영구히 잃습니다',
+      apply: (run) => { run.playerMaxHp -= 10; run.playerHp = Math.min(run.playerHp, run.playerMaxHp); },
+      available: (run) => run.playerMaxHp > 40,
+    },
+    {
+      key: 'hermit', name: '은거 고수', icon: '🧙',
+      story: '낚싯대를 든 노인이 겨루자 합니다. 한 수 배우는 대신 짐을 덜라 합니다.',
+      gain: '초식 1장을 연마합니다',
+      cost: '덱에서 초식 1장을 잊습니다',
+      apply: () => {},
+      available: (run) => run.deck.length > 8,
+    },
+  ],
+
+  // 기연 '마공'과 '비급'이 주는 색 밖의 초식. 시작 덱에도 보상 풀에도
+  // 없는 것만 둔다 — 기연으로만 닿는다는 감각이 있어야 한다.
+  FORTUNE_CARDS: {
+    // 마공 — 강력하되 제 몸을 태운다
+    demonic: [
+      { key: 'blood_oath', name: '혈맹세', cost: 2, damage: 14, block: 0, hpCost: 6 },
+      { key: 'demon_grasp', name: '마라수', cost: 3, damage: 10, block: 0, lifesteal: 60 },
+      { key: 'soul_burn', name: '연혼결', cost: 2, damage: 8, block: 0, rageScale: 4 },
+    ],
+    // 비급 — 야전에서 익힌 무색 무공. 어느 문파에도 속하지 않는다
+    manual: [
+      { key: 'wanderer_step', name: '유운보', cost: 1, damage: 0, block: 6, draw: 1 },
+      { key: 'field_cut', name: '야전참', cost: 2, damage: 9, block: 0 },
+      { key: 'breath_art', name: '토납법', cost: 1, damage: 0, block: 4, heal: 5 },
+    ],
+  },
 };

@@ -370,3 +370,70 @@ button:hover { border-color: var(--text-dim); }
 }
 .uc-row b { font-weight: 600; opacity: 0.85; margin-right: 3px; }
 .uc-row i { font-style: normal; opacity: 0.65; margin: 0 2px; }
+
+/* ── 갈림길 (gdd/13-crossroads.md) ─────────────────────────── */
+.crossroad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+
+.intel-strip {
+  grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 8px;
+  background: rgba(77, 155, 230, 0.10);
+  border: 1px solid rgba(77, 155, 230, 0.28);
+  font-size: 12px;
+}
+.intel-label {
+  font-size: 11px; letter-spacing: 0.08em; color: var(--gauge-e-safe);
+  text-transform: uppercase; font-weight: 700;
+}
+.intel-item { color: var(--text-dim); }
+.intel-item b { color: var(--text); font-weight: 600; }
+
+.crossroad-card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+  padding: 18px 16px; cursor: pointer; text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.crossroad-card:hover { transform: translateY(-4px); border-color: var(--break); }
+.crossroad-card .cr-icon { font-size: 30px; line-height: 1; }
+.crossroad-card .cr-name { font-weight: 700; font-size: 15px; }
+.crossroad-card .cr-blurb { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.crossroad-card .cr-detail {
+  margin-top: auto; padding-top: 8px; font-size: 11px; line-height: 1.5;
+  color: var(--orange); border-top: 1px dashed var(--panel-border);
+}
+/* 비무대회만 다르게 보여야 한다 — 유일하게 죽을 수 있는 걸음이다 */
+.crossroad-card.node-elite { border-color: var(--red-dim); }
+.crossroad-card.node-elite:hover { border-color: var(--danger); }
+.crossroad-card.node-elite .cr-detail { color: var(--danger); }
+.crossroad-card.node-fortune .cr-detail { color: var(--break); }
+
+/* ── 걸음 안의 선택 ────────────────────────────────────────── */
+.node-body { display: flex; flex-direction: column; gap: 10px; }
+.node-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.node-option {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 14px; border-radius: 10px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.node-option:hover { transform: translateY(-3px); border-color: var(--break); }
+.node-option.disabled { opacity: 0.4; cursor: default; }
+.node-option.disabled:hover { transform: none; border-color: var(--panel-border); }
+.node-option .no-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.node-option .no-name { font-weight: 700; font-size: 14px; }
+.node-option .no-tag {
+  font-size: 10px; padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.08); color: var(--text-dim);
+}
+.node-option .no-cost { font-size: 11px; color: var(--orange); }
+.node-option .no-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+/* 직전 걸음의 결과 — 전투 머리에 한 줄 */
+.node-echo {
+  font-size: 11px; color: var(--green);
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(77, 230, 138, 0.10);
+}
+.node-echo.hidden { display: none; }

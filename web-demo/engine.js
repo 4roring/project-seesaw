@@ -53,6 +53,9 @@ const TS_Engine = (() => {
       enemyRealm: enemy.realm || '',
       // 손패 뚜껑은 문파마다 다르다 (gdd/07 7-2)
       handRefillCap: config.handCap != null ? config.handCap : D.HAND_REFILL_CAP,
+      // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
+      // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
+      minMomentumReturn: config.minReturn != null ? config.minReturn : D.MIN_MOMENTUM_RETURN,
 
       // 정확히 1턴만 유효한 상태
       playerWeakenActive: false,
@@ -297,8 +300,8 @@ const TS_Engine = (() => {
   }
 
   // 최소 반환 보장(아3) + 범위 하한 (gdd/08 8-4-4)
-  function clampReturnedGauge(finalGauge) {
-    return Math.max(Math.min(finalGauge, -D.MIN_MOMENTUM_RETURN), D.GAUGE_MIN);
+  function clampReturnedGauge(game, finalGauge) {
+    return Math.max(Math.min(finalGauge, -game.minMomentumReturn), D.GAUGE_MIN);
   }
 
   function tickBossCooldowns(game) {
@@ -367,7 +370,7 @@ const TS_Engine = (() => {
       if (skill.cooldown > 0) cooldowns[skill.key] = skill.cooldown;
     }
     // 실제 종료와 동일한 보정을 적용해야 미리보기와 결과가 일치한다
-    return { steps, finalGauge: clampReturnedGauge(gauge) };
+    return { steps, finalGauge: clampReturnedGauge(game, gauge) };
   }
 
   function previewIntent(game) {
@@ -404,7 +407,7 @@ const TS_Engine = (() => {
       game.isBossStunned = false;
       // 기절 페이즈에도 최소 반환 보장을 적용 — 없으면 파훼 직후 합에
       // 오히려 가장 얕은 반환이 나오는 최악의 경우가 생긴다.
-      game.gauge = clampReturnedGauge(-n);
+      game.gauge = clampReturnedGauge(game, -n);
       return;
     }
 
@@ -420,7 +423,7 @@ const TS_Engine = (() => {
         tickBossCooldowns(game);
         const cut = runBossPhaseLoop(game, reduced);
         if (game.status !== 'PLAYING') return;
-        game.gauge = clampReturnedGauge(cut);
+        game.gauge = clampReturnedGauge(game, cut);
         pushFx(game, 'memory', { to: game.gauge });
         return;
       }
@@ -436,7 +439,7 @@ const TS_Engine = (() => {
     tickBossCooldowns(game);
     const finalGauge = runBossPhaseLoop(game, n);
     if (game.status !== 'PLAYING') return;
-    game.gauge = clampReturnedGauge(finalGauge);
+    game.gauge = clampReturnedGauge(game, finalGauge);
     if (game.gauge !== finalGauge) {
       pushLog(game, `최소 반환 보장 — ${gaugeLabel(finalGauge)} → ${gaugeLabel(game.gauge)}으로 보정.`);
     }

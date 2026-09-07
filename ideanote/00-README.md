@@ -42,10 +42,16 @@
 **채택된 노트의 규칙 본문은 gdd로 옮기고 노트에는 남기지 않습니다.** 정본이
 둘이면 반드시 어긋나고, 그때 어느 쪽이 맞는지 아무도 모르게 됩니다.
 
-## 지금 무엇을 하고 있나 (2026-09-04)
+## 지금 무엇을 하고 있나 (2026-09-07)
 
-`gdd/`가 4색(적·흑·백·자)과 스테이지 1~10의 재미를 담당합니다. 위 색인의
-보류 항목은 **그 둘이 재미있다는 게 확인된 뒤에** 다시 꺼냅니다 — 특히
+4색과 10스테이지의 재미가 확인되어, [012 갈림길](012-node-map.md)이
+[gdd/13](../gdd/13-crossroads.md)으로 졸업했습니다. 다음 후보는
+[011 무기](011-weapons-slots.md)입니다 — 걸음 하나가 밸런스를 크게 흔든
+직후라, 백의 이진성([gdd/13-5](../gdd/13-crossroads.md))을 먼저 손보는 편이
+낫습니다.
+
+위 색인의 나머지 보류 항목은 **4색과 10스테이지가 재미있다는 게 확인된
+뒤에** 다시 꺼냅니다 — 특히
 색을 5~7로 늘리는 것은 [11-3의 "컬러별 출구"](../gdd/11-card-tiers.md)를
 색마다 하나씩 더 설계해야 한다는 뜻이라, 현재 4색이 균형을 잡기 전에는
 비용만 늘어납니다.
@@ -61,9 +67,9 @@
 | [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | ⏸ 보류 | 새 시스템. 현재 4색 출구를 다듬는 게 먼저 |
 | [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | ⏸ 보류 | 런 간 메타 진행. 한 런의 재미가 먼저 |
 | [008-ascension-goal.md](008-ascension-goal.md) | ⏸ 보류 | 런의 목표 = 등선(登仙). 클리어할수록 높아지는 난이도 사다리. 004와 한 쌍 |
-| [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **전투 규칙을 안 건드려 병렬 진행 가능** |
+| [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **기록 재료는 [gdd/13-6](../gdd/13-crossroads.md)이 이미 쌓고 있음** |
 | [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리 |
-| [011-weapons-slots.md](011-weapons-slots.md) | ⏸ 보류 | 무기 = 색과 곱해지는 둘째 축. 슬롯 2칸 · 이기어검 · 심검. [001](001-artifact-system.md)과 한 몸 |
-| [012-node-map.md](012-node-map.md) | ⏸ 보류 | 스테이지마다 3지선다 — 비무 · 수련장 · 주루 · 문파 방문 · 기연. 009의 콘텐츠 공급원 |
+| [011-weapons-slots.md](011-weapons-slots.md) | ⏸ 보류 | 무기 = 색과 곱해지는 둘째 축. **보상 슬롯 경쟁은 [gdd/13-7](../gdd/13-crossroads.md)이 풀었음** — 다음 후보 |
+| [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
 | [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
 | [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |

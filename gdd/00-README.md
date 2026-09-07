@@ -22,6 +22,7 @@
 | [10-enemy-roster.md](10-enemy-roster.md) | 적 10종 — 개성을 만드는 두 축(빈틈·클로저 성격)과 스테이지 편성 |
 | [11-card-tiers.md](11-card-tiers.md) | 경지(티어) 체계 + 컬러별 출구 메커니즘 + 카드 목록 |
 | [12-murim-terms.md](12-murim-terms.md) | 무림 용어 정본, 작명 규칙, 이름에 관한 저작권 원칙 |
+| [13-crossroads.md](13-crossroads.md) | 갈림길 — 비무 사이의 걸음(수련장·주루·문파 방문·비무대회·기연) |
 
 ## 한 줄 요약
 

@@ -31,13 +31,27 @@ window.TS_Sim = (() => {
     // 방어도/회복을 피해의 0.6배로 보던 초기 가중치는 방어형 컬러를 구조적으로
     // 과소평가했다. 실측상 백(피해 절반, 도달 9.8)이 증명하듯 경감은 피해와
     // 거의 동등한 가치라, 1.0으로 맞춰야 컬러 비교가 공정해진다.
-    v += (c.block || 0) * 1.0 + (c.heal || 0) * 1.0 + (c.draw || 0) * 4 + (c.counter || 0) * 0.8;
+    v += (c.block || 0) * 1.0 + (c.heal || 0) * 1.0 + (c.draw || 0) * 4 + (c.counter || 0) * 1.2;
     if (c.lifesteal) v += (c.damage || 0) * c.lifesteal / 100;
     if (c.evade) v += c.evade * 7; // 일격 하나를 통째로 넘기는 값어치
+    // B라인 필드 (gdd/03 3-2). 여기 빠져 있으면 점수가 0이 되고, 문파 방문
+    // 교환에서 AI가 그 문파의 핵심 초식을 "값 없는 카드"로 놓아 버린다.
+    // 실제로 백의 몰아치기 카드가 통째로 버려져 파훼율이 31% → 21%로
+    // 떨어졌고, 3스테이지(철벽 무승, 빈틈 9) 사망이 0 → 16으로 튀었다.
+    if (c.deepStrike) v += c.deepStrike * Math.max(0, -g.gauge);
+    if (c.rageScale) v += c.rageScale * Math.floor((g.playerMaxHp - g.playerHp) / 10);
+    if (c.surge) v += c.surge * 3;      // 기세를 안 쓰고 파훼선에 다가간다
+    if (c.sealSkill) v += c.sealSkill * 5; // 적의 가장 비싼 초식을 지운다
+    if (c.drainPower) v += c.drainPower * 4;
     if (c.effect) v += 4;
     if (c.rewind) v += c.rewind * 3;
     if (c.bossWeaken) v += 3;
-    if (c.breakThresholdDown) v += 5;
+    // 빈틈 감소는 이번 전투 내내 남는다 — 한 번 쓰고 마는 피해와 같은
+    // 자로 재면 안 된다. 5로 두었더니 탐색 AI가 백의 '파계진언'을 교환에서
+    // 매번 내다 버렸고(40런 중 최다 교환), 파훼율이 31% → 24%로 떨어지며
+    // 3스테이지(철벽 무승, 빈틈 9) 사망이 1 → 17로 튀었다. 파훼 한 번은
+    // 적 페이즈 하나를 통째로 지우므로 그만큼 값을 매긴다.
+    if (c.breakThresholdDown) v += c.breakThresholdDown * 8;
     v -= (c.hpCost || 0) * 0.8;
     return v / Math.max(0.5, cost(g, c));
   }
@@ -221,16 +235,94 @@ window.TS_Sim = (() => {
     }
   }
 
+  // ── 걸음의 정책 (gdd/13-crossroads.md) ──────────────────────
+  // 전투만 자동화하고 걸음을 아무렇게나 고르면, 걸음이 밸런스에 얼마나
+  // 기여하는지가 통계에서 통째로 사라진다. 전투 정책과 같은 3단계로 나눈다.
+  //   casual : 눈에 띄는 대로 고른다. 체력도 안 본다.
+  //   그 외   : 체력을 보고 쉴지 얻을지 정하고, 위험한 걸음은 여유가 있을
+  //            때만 고른다.
+  function crossroadScore(st, key) {
+    const hp = st.playerHp / st.playerMaxHp;
+    if (key === 'TRAINING') return hp < 0.65 ? 60 + (1 - hp) * 90 : 45;
+    if (key === 'TAVERN') return hp < 0.65 ? 30 + (1 - hp) * 50 : 12;
+    if (key === 'SECT_VISIT') return 50;
+    // 비무대회는 유일하게 죽을 수 있는 걸음이다 — 여유가 있을 때만
+    if (key === 'ELITE') return hp > 0.85 ? 58 : 4;
+    if (key === 'FORTUNE') return 38;
+    return 0;
+  }
+
+  function pickCrossroad(st, casual) {
+    const opts = st.crossroad.slice();
+    if (casual) return opts[Math.floor(Math.random() * opts.length)];
+    return opts.sort((a, b) => crossroadScore(st, b) - crossroadScore(st, a))[0];
+  }
+
+  function pickNodeOption(st, casual) {
+    const view = st.nodeView;
+    const live = (view.options || []).filter((o) => !o.disabled);
+    if (!live.length) return null;
+    if (casual) return live[Math.floor(Math.random() * live.length)].id;
+
+    const g = st.game;
+    const hp = st.playerHp / st.playerMaxHp;
+
+    if (st.node.key === 'TRAINING') {
+      const rest = live.find((o) => o.id === 'rest');
+      if (rest && hp < 0.65) return rest.id;
+      const learn = live.find((o) => o.id === 'learn');
+      if (learn) return learn.id;
+      // 강화는 "지금 덱에서 가장 값나가는 카드"를 더 키운다
+      const ups = live.filter((o) => o.upgrade);
+      if (ups.length) {
+        ups.sort((a, b) => score(g, st.deck[b.cardIndex]) - score(g, st.deck[a.cardIndex]));
+        return ups[0].id;
+      }
+      return (rest || live[0]).id;
+    }
+
+    if (st.node.key === 'SECT_VISIT') {
+      const drop = live.filter((o) => o.id.startsWith('drop:'));
+      if (drop.length) {
+        // 놓을 것은 지금 덱에서 가장 값 없는 초식
+        drop.sort((a, b) => score(g, a.card) - score(g, b.card));
+        return drop[0].id;
+      }
+      const cards = live.filter((o) => o.card);
+      if (!cards.length) return live[0].id;
+      cards.sort((a, b) => score(g, b.card) - score(g, a.card));
+      // 얻을 것이 놓을 것보다 못하면 물러선다. 교환이 강제이던 시절엔
+      // 이 판단을 못 해서, 시작 덱이 아직 멀쩡한 1~2스테이지에 핵심
+      // 초식을 헐값에 내주고 3스테이지(빈틈 9)에서 무너졌다.
+      const worst = Math.min(...st.deck.map((c) => score(g, c)));
+      if (score(g, cards[0].card) <= worst && live.some((o) => o.id === 'leave')) return 'leave';
+      return cards[0].id;
+    }
+
+    if (st.node.key === 'FORTUNE') {
+      const forget = live.filter((o) => o.id.startsWith('forget:'));
+      if (forget.length) {
+        // 덜어낼 것은 가장 값 없는 초식
+        forget.sort((a, b) => score(g, a.card) - score(g, b.card));
+        return forget[0].id;
+      }
+      // 최대 체력을 깎는 마공은 여유가 있을 때만
+      if (st.node.fortune === 'demonic' && hp < 0.6) return 'refuse';
+      return 'accept';
+    }
+    return live[0].id;
+  }
+
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
     const casual = !!(opts && opts.casual);
     const search = !!(opts && opts.search);
     const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
-    const stat = { plays: 0, draws: 0, turns: 0, dist: {}, breaks: 0 };
+    const stat = { plays: 0, draws: 0, turns: 0, dist: {}, breaks: 0, nodes: {}, elites: 0 };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
       R.newRun(); R.chooseDeck(color);
-      let guard = 0;
+      let guard = 0, lastNodeId = null, nodeRepeat = 0;
       while (guard++ < 4000) {
         const st = R.get();
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
@@ -247,6 +339,22 @@ window.TS_Sim = (() => {
           if (casual) { if (o.length) R.takeCard(o[Math.floor(Math.random() * o.length)]); else R.skipReward(); }
           else { o.sort((a, b) => score(st.game, b) - score(st.game, a));
                  if (o.length) R.takeCard(o[0]); else R.skipReward(); }
+        } else if (st.phase === 'CROSSROAD') {
+          const key = pickCrossroad(st, casual);
+          stat.nodes[key] = (stat.nodes[key] || 0) + 1;
+          if (key === 'ELITE') stat.elites++;
+          R.chooseNode(key);
+        } else if (st.phase === 'NODE') {
+          const id = pickNodeOption(st, casual);
+          if (id == null) break;
+          // 걸음이 제자리를 돌면 바깥 guard가 조용히 런을 끊고, 그 런은
+          // "그 스테이지에서 죽었다"로 집계된다 — 통계가 통째로 거짓이
+          // 되면서 아무 경고도 안 뜬다. 실제로 한 번 당했다.
+          if (id === lastNodeId && ++nodeRepeat > 8) {
+            throw new Error(`걸음이 진행되지 않습니다: ${st.node && st.node.key} / ${id}`);
+          }
+          if (id !== lastNodeId) { lastNodeId = id; nodeRepeat = 0; }
+          R.chooseNodeOption(id);
         } else break;
       }
       const st = R.get();
@@ -261,6 +369,7 @@ window.TS_Sim = (() => {
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
       drawActPerTurn: (stat.draws / stat.turns).toFixed(2),
       breakRate: (stat.breaks / stat.turns * 100).toFixed(0) + '%',
+      nodes: stat.nodes,
       deathAt: stat.dist,
     };
   }
