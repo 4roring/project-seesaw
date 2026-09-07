@@ -407,10 +407,26 @@ const TS_Engine = (() => {
     }
 
     if (game.momentumSpentThisTurn >= game.breakThreshold) {
-      pushLog(game, `[파훼!] 이번 합 몰아치기 ${game.momentumSpentThisTurn} — 적 행동 취소, 1합 무너짐, 다음 합 사혈 노출.`);
       pushFx(game, 'break', {});
-      game.isBossStunned = true;
-      game.bossVulnerableActive = true;
+      if (D.BREAK_GRANTS_VULNERABLE) game.bossVulnerableActive = true;
+
+      if (D.BREAK_BUDGET_RATIO != null) {
+        // 페이즈를 지우는 대신 예산을 깎아 진행한다 — 반격이 사라지는 게
+        // 아니라 작아진다.
+        const reduced = Math.max(0, Math.floor(n * D.BREAK_BUDGET_RATIO));
+        pushLog(game, `[파훼!] 몰아치기 ${game.momentumSpentThisTurn} — 적의 예산이 ${n} → ${reduced}으로 무너집니다.`);
+        tickBossCooldowns(game);
+        const cut = runBossPhaseLoop(game, reduced);
+        if (game.status !== 'PLAYING') return;
+        game.gauge = clampReturnedGauge(cut);
+        pushFx(game, 'memory', { to: game.gauge });
+        return;
+      }
+
+      const parts = ['적 행동 취소'];
+      if (D.BREAK_STUNS_NEXT_PHASE) { game.isBossStunned = true; parts.push('1합 무너짐'); }
+      if (D.BREAK_GRANTS_VULNERABLE) parts.push('다음 합 사혈 노출');
+      pushLog(game, `[파훼!] 이번 합 몰아치기 ${game.momentumSpentThisTurn} — ${parts.join(', ')}.`);
       game.gauge = D.STARTING_GAUGE;
       return;
     }

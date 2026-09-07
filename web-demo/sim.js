@@ -226,7 +226,7 @@ window.TS_Sim = (() => {
     const casual = !!(opts && opts.casual);
     const search = !!(opts && opts.search);
     const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
-    const stat = { plays: 0, draws: 0, turns: 0, dist: {} };
+    const stat = { plays: 0, draws: 0, turns: 0, dist: {}, breaks: 0 };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
       R.newRun(); R.chooseDeck(color);
@@ -236,8 +236,10 @@ window.TS_Sim = (() => {
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
         if (st.phase === 'BATTLE') {
           if (st.game.status !== 'PLAYING') { R.syncBattleResult(); continue; }
+          const logAt = st.game.log.length;
           if (search) searchAutoTurn(st.game, stat, nodeCap);
           else autoTurn(st.game, stat, planned, casual);
+          if (st.game.log.slice(logAt).some((l) => l.includes('[파훼!]'))) stat.breaks++;
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
           const o = st.rewardOptions.slice();
@@ -258,6 +260,7 @@ window.TS_Sim = (() => {
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
       drawActPerTurn: (stat.draws / stat.turns).toFixed(2),
+      breakRate: (stat.breaks / stat.turns * 100).toFixed(0) + '%',
       deathAt: stat.dist,
     };
   }

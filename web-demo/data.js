@@ -18,6 +18,14 @@ const TS_DATA = {
   DRAW_ACTION_COST: 2, // "숨 고르기"가 내주는 기세 (적 쪽으로 미는 양)
   DRAW_ACTION_CARDS: 1, // "숨 고르기"로 뽑는 카드 수
   COMBO_THRESHOLD: 3, // 이번 합의 카드 사용 수가 이 값에 도달할 때마다 추가 드로우
+  // ── 파훼 보상 구성 (gdd/02 2-1) ──────────────────────────────
+  // 파훼는 원래 "적 페이즈 취소 + 다음 페이즈까지 기절 + 사혈 노출"로
+  // 페이즈를 두 개 지웠다. 최적 플레이가 파훼를 노릴수록 압도적이 되는
+  // 원인이라 요소별로 켜고 끌 수 있게 뺐다.
+  BREAK_STUNS_NEXT_PHASE: true,  // 다음 페이즈까지 통째로 지울 것인가
+  BREAK_GRANTS_VULNERABLE: true, // 다음 합 사혈 노출(+50%)을 줄 것인가
+  BREAK_BUDGET_RATIO: null,      // null이면 페이즈 취소. 0.5면 예산 절반으로 진행
+
   MIN_MOMENTUM_RETURN: 3, // 적 페이즈가 끝날 때 보장되는 최소 기세(아3)
   STAGE_HEAL_RATIO: 0.5, // 스테이지 클리어 후 잃은 체력의 50% 회복 (gdd 09 문서 9-4)
   REWARD_CHOICES: 3, // 보상으로 제시되는 카드 장수
