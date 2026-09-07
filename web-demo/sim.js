@@ -2,7 +2,15 @@
 // 사용법: 브라우저 콘솔에서
 //   fetch('sim.js').then(r=>r.text()).then(eval);
 //   ['RED','BLUE','BLACK','YELLOW'].map(c => TS_Sim.run(c, 40));
-//   TS_Sim.run(c, 40, { planned: true })   // 계획형 정책으로 비교
+//   TS_Sim.run(c, 40, { planned: true })   // 계획형 정책
+//   TS_Sim.run(c, 40, { casual: true })    // 초심자 정책
+//
+// 정책 3단계 — 이 폭이 곧 "실력에 따른 난이도 밴드"다.
+//   casual  : 큰 피해만 보고 낸다. 기세를 아껴 쓰지 않고, 파훼를 노리지
+//             않으며, 방어/회복/드로우의 값을 모른다. 보상도 아무거나 고른다.
+//   greedy  : 효율(가치/틈)로 고르고 기세를 정확히 맞춰 쓴다. 파훼가 닿으면
+//             노린다. 이미 상당한 수준의 플레이라 "하한"이 아니다.
+//   planned : greedy + 타이밍 판단(패 파기는 손패가 쌓인 뒤, 연계는 나중에).
 // 간단한 탐욕 AI로 런을 자동 플레이해 클리어율·평균 도달 스테이지·
 // 턴당 카드 사용 수·사망 스테이지 분포를 집계한다.
 window.TS_Sim = (() => {
@@ -32,6 +40,12 @@ window.TS_Sim = (() => {
 
   const usable = (g, c) => !(c.hpCost && c.hpCost >= g.playerHp);
 
+  // ⚠️ 이 정책의 알려진 편향: 기세를 딱 맞춰 아껴 쓰느라 몰아치기가 안 쌓여
+  // 파훼를 거의 못 낸다 (백 기준 파훼율 10%, 아무거나 지르는 초심자 정책은
+  // 31%). "효율적으로 쓰기"와 "파훼 노리기"가 반대 방향이라 생기는 일이고,
+  // 그래서 백은 초심자 정책이 탐욕 정책보다 잘한다(80% vs 25%).
+  // 파훼를 합 단위로 계획하는 정책을 만들어 보정해야 정확한 수치가 나온다.
+
   // 계획형 정책이 추가로 지키는 규칙. "생각을 많이 하면 얼마나 좋아지는가"를
   // 재기 위한 것이라, 사람이 실제로 할 법한 판단만 넣는다.
   //   1) 패 파기는 손패가 충분히 쌓였을 때만 (블루의 핵심 타이밍)
@@ -44,13 +58,40 @@ window.TS_Sim = (() => {
     return false;
   }
 
-  function autoTurn(g, stat, planned) {
+  // 초심자 점수 — 피해만 본다. 방어도·회복·드로우·유틸의 값을 모르고,
+  // 틈 대비 효율도 따지지 않는다.
+  function casualScore(g, c) {
+    let v = c.damage || 0;
+    if (c.chain) v += c.chain * g.cardsPlayedThisTurn;
+    if (c.discardAll) v += c.discardAll * (g.hand.length - 1);
+    return v;
+  }
+
+  function autoTurn(g, stat, planned, casual) {
     const t = g.turn;
     let guard = 0;
     stat.turns++;
     while (g.status === 'PLAYING' && g.turn === t && guard++ < 40) {
       // 1) 턴을 끝내지 않고 낼 수 있는 카드 중 효율 최고
       let playable = g.hand.filter((c) => usable(g, c) && g.gauge + cost(g, c) - (c.rewind || 0) <= 0);
+      if (casual) {
+        // 초심자는 기세를 아껴 쓰지 않는다 — 가장 세 보이는 걸 그냥 낸다.
+        if (playable.length) {
+          playable.sort((a, b) => casualScore(g, b) - casualScore(g, a));
+          stat.plays++;
+          E.playCard(g, playable[0].uid);
+          continue;
+        }
+        // 낼 수 있는 게 없으면 손패에서 제일 센 걸 지르고 합을 넘긴다.
+        // 파훼는 계산하지 않는다.
+        const hand = g.hand.filter((c) => usable(g, c));
+        if (hand.length) {
+          hand.sort((a, b) => casualScore(g, b) - casualScore(g, a));
+          stat.plays++;
+          E.playCard(g, hand[0].uid);
+        } else { stat.draws++; E.drawAction(g); }
+        continue;
+      }
       if (planned) {
         const kept = playable.filter((c) => !planHolds(g, c));
         // 전부 보류되면 이번 합엔 낼 게 없다는 뜻이라 보류를 푼다
@@ -84,6 +125,7 @@ window.TS_Sim = (() => {
 
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
+    const casual = !!(opts && opts.casual);
     const stat = { plays: 0, draws: 0, turns: 0, dist: {} };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
@@ -94,11 +136,14 @@ window.TS_Sim = (() => {
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
         if (st.phase === 'BATTLE') {
           if (st.game.status !== 'PLAYING') { R.syncBattleResult(); continue; }
-          autoTurn(st.game, stat, planned);
+          autoTurn(st.game, stat, planned, casual);
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
-          const o = st.rewardOptions.slice().sort((a, b) => score(st.game, b) - score(st.game, a));
-          if (o.length) R.takeCard(o[0]); else R.skipReward();
+          const o = st.rewardOptions.slice();
+          // 초심자는 보상도 아무거나 고른다
+          if (casual) { if (o.length) R.takeCard(o[Math.floor(Math.random() * o.length)]); else R.skipReward(); }
+          else { o.sort((a, b) => score(st.game, b) - score(st.game, a));
+                 if (o.length) R.takeCard(o[0]); else R.skipReward(); }
         } else break;
       }
       const st = R.get();
@@ -107,7 +152,7 @@ window.TS_Sim = (() => {
     }
     return {
       color,
-      policy: planned ? '계획' : '탐욕',
+      policy: casual ? '초심자' : planned ? '계획' : '탐욕',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
