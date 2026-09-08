@@ -49,6 +49,11 @@ const TS_Engine = (() => {
       // base는 임계점 축소 카드의 하한을 상대값으로 계산하기 위해 남긴다.
       baseBreakThreshold: enemy.breakThreshold,
       breakThreshold: enemy.breakThreshold,
+      // 빈틈 감소는 이번 합에만 남는다. 전투 내내 남기면 파훼가 계단
+      // 함수라서(넘거나 못 넘거나) 임계점을 영구히 내리는 카드는 값이
+      // 없거나 게임을 끝내거나 둘 중 하나가 된다 — 중간이 없다.
+      // 실측: 백은 이 필드가 있으면 96%, 없으면 2%였다 (gdd/02 2-4).
+      thresholdDownThisTurn: 0,
       closerStyle: enemy.closerStyle || 'DOMINANT', // 패도 | 노회 (gdd/08 8-4-1)
       enemyRealm: enemy.realm || '',
       // 손패 뚜껑은 문파마다 다르다 (gdd/07 7-2)
@@ -63,7 +68,11 @@ const TS_Engine = (() => {
       // 다음 피격 1회에 소모되는 상태
       playerVulnerableActive: false,
       bossWeakenActive: false, // 적의 다음 공격 피해 -25% (자 '부식장')
-      counterDamage: 0,        // 다음 피격 시 돌려줄 반탄 피해 (백 '반탄강기')
+      // 반탄은 적 페이즈 하나를 통째로 버틴다 — 피격 1회로 소모되던 시절엔
+      // 한 장 써서 5~10을 한 번 돌려주는 게 전부라 사실상 함정 카드였다
+      // (반탄을 통째로 지워도 백의 클리어율이 98% → 93%로만 움직였다).
+      // 적 페이즈는 2~4대를 때리므로, 유지되면 "때릴수록 아프다"가 성립한다.
+      counterDamage: 0,
       evadeCharges: 0,         // 남은 흘리기 횟수 — 피격 1회를 통째로 무효화 (흑)
 
       // "다음 카드 한 장" 보너스 — 소비될 때까지 턴을 넘겨도 유지 (gdd 06 문서)
@@ -136,6 +145,7 @@ const TS_Engine = (() => {
       refillCount = Math.min(refillCount, Math.max(0, game.handRefillCap - game.hand.length));
     }
     game.playerBlock = 0;
+    game.counterDamage = 0; // 반탄은 적 페이즈 하나만 버틴다
     // pendingCostReduction / pendingDamageMultiplier는 리셋하지 않는다 — 실제로
     // 카드에 소비될 때까지 턴을 넘겨도 유지 (gdd/06 6-6)
     game.cardsPlayedThisTurn = 0;
@@ -144,6 +154,7 @@ const TS_Engine = (() => {
     game.cardDrawsThisTurn = 0;
     game.cardsDiscardedThisTurn = 0;
     game.momentumSpentThisTurn = 0;
+    game.thresholdDownThisTurn = 0;
     tickActiveEffects(game);
     drawCards(game, refillCount);
     pushLog(game, `--- ${game.turn}합 시작 (기세 ${gaugeLabel(game.gauge)}) ---`);
@@ -187,6 +198,12 @@ const TS_Engine = (() => {
     const healed = game.playerHp - before;
     if (healed > 0) pushFx(game, 'heal', { amount: healed });
     return healed;
+  }
+
+  // 이번 합에 실제로 넘어야 하는 빈틈. 하한을 두는 이유는 gdd/02 2-3.
+  function effectiveBreakThreshold(game) {
+    const floor = Math.max(5, game.baseBreakThreshold - 4);
+    return Math.max(floor, game.breakThreshold - game.thresholdDownThisTurn);
   }
 
   function gaugeLabel(g) {
@@ -249,10 +266,10 @@ const TS_Engine = (() => {
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
 
-    // 반격 (백 '반탄강기') — 피격 시 1회 소모
+    // 반격 (백 '반탄강기') — 이번 적 페이즈의 매 피격마다 돌려준다.
+    // 소모되지 않고, 다음 내 합이 시작될 때 사라진다.
     if (game.counterDamage > 0) {
       const counter = game.counterDamage;
-      game.counterDamage = 0;
       applyDamageToBoss(game, counter);
       pushLog(game, `반탄! ${counter} 피해를 돌려줍니다.`);
       pushFx(game, 'playerAttack', { amount: counter, label: '반탄' });
@@ -375,7 +392,7 @@ const TS_Engine = (() => {
 
   function previewIntent(game) {
     if (game.gauge <= 0) {
-      const need = game.breakThreshold - game.momentumSpentThisTurn;
+      const need = effectiveBreakThreshold(game) - game.momentumSpentThisTurn;
       if (need <= 0) {
         return { text: '몰아치기 완성 — 이대로 선을 넘기면 파훼!', tone: 'break' };
       }
@@ -388,7 +405,7 @@ const TS_Engine = (() => {
     if (game.isBossStunned) {
       return { text: `적${n} 도달 — 적이 무너져 행동하지 못합니다.`, tone: 'stunned' };
     }
-    if (game.momentumSpentThisTurn >= game.breakThreshold) {
+    if (game.momentumSpentThisTurn >= effectiveBreakThreshold(game)) {
       const auraPct = sumEffectAmount(game, 'BOSS_VULNERABLE_AURA');
       return { text: `파훼! 적 행동 취소 + 무너짐 + 다음 합 사혈 노출(+${50 + auraPct}% 피해)`, tone: 'break' };
     }
@@ -411,7 +428,7 @@ const TS_Engine = (() => {
       return;
     }
 
-    if (game.momentumSpentThisTurn >= game.breakThreshold) {
+    if (game.momentumSpentThisTurn >= effectiveBreakThreshold(game)) {
       pushFx(game, 'break', {});
       if (D.BREAK_GRANTS_VULNERABLE) game.bossVulnerableActive = true;
 
@@ -563,7 +580,7 @@ const TS_Engine = (() => {
     }
     if (card.counter) {
       game.counterDamage += card.counter;
-      pushLog(game, `다음 피격 시 반탄 ${game.counterDamage} 준비.`);
+      pushLog(game, `반탄 ${game.counterDamage} — 이번 적 페이즈의 매 피격마다 되돌립니다.`);
     }
     if (card.evade) {
       game.evadeCharges += card.evade;
@@ -605,14 +622,13 @@ const TS_Engine = (() => {
     if (card.breakThresholdDown) {
       // 하한은 빈틈 - 4, 최소 5 (gdd/02 2-3). 절대값으로 잡으면 빈틈이
       // 작은 적에겐 무효, 큰 적에겐 파격이 되어 같은 카드가 상대에 따라
-      // 무의미하거나 압도적이 된다. 최소 5는 "한 합의 평균 몰아치기"가
-      // 4~6이라, 그 아래로 내리면 매 합 파훼가 나기 때문이다.
-      const floor = Math.max(5, game.baseBreakThreshold - 4);
-      const before = game.breakThreshold;
-      game.breakThreshold = Math.max(floor, game.breakThreshold - card.breakThresholdDown);
-      pushLog(game, before === game.breakThreshold
-        ? `파훼 임계점은 이미 하한(적${floor})입니다.`
-        : `파훼 임계점 적${before} → 적${game.breakThreshold}.`);
+      // 무의미하거나 압도적이 된다.
+      const before = effectiveBreakThreshold(game);
+      game.thresholdDownThisTurn += card.breakThresholdDown;
+      const after = effectiveBreakThreshold(game);
+      pushLog(game, before === after
+        ? `이번 합 빈틈은 이미 하한(적${after})입니다.`
+        : `이번 합 빈틈 적${before} → 적${after}.`);
     }
 
     // 태그형 효과
@@ -696,5 +712,6 @@ const TS_Engine = (() => {
     }
   }
 
-  return { createGame, playCard, drawAction, previewIntent, gaugeLabel, buildDeck };
+  return { createGame, playCard, drawAction, previewIntent, gaugeLabel, buildDeck,
+    effectiveBreakThreshold };
 })();

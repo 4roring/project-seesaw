@@ -122,13 +122,13 @@ const TS_DATA = {
     ],
     BLACK: [
       { key: 'guard', name: '금강불괴', cost: 1, damage: 0, block: 8, count: 3 },
-      { key: 'anchor', name: '금강저', cost: 2, damage: 11, block: 3, count: 3 },
+      { key: 'anchor', name: '금강저', cost: 2, damage: 14, block: 3, count: 3 },
       { key: 'fortify', name: '반석세', cost: 1, damage: 0, block: 4, count: 2, effect: 'PERSISTENT_BLOCK_ON_TURN_START', persistentPayload: { id: 'aura-block-on-turn', name: '반석세', amount: 2, turns: 2 } },
       { key: 'reboot', name: '반탄강기', cost: 2, damage: 0, block: 6, count: 1, counter: 8 },
       // 임계점 조작은 "틈이 큰 초식 한 장"과 짝을 이뤄야만 값을 한다 (파훼는
       // 한 장으로만 낼 수 있으므로). 그 짝이 없으면 완전한 백지 카드가 되므로
       // 최소한 몸값은 하도록 방어도를 붙였다.
-      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 7, count: 1, breakThresholdDown: 2 },
+      { key: 'threshold', name: '파계진언', cost: 2, damage: 0, block: 7, count: 1, breakThresholdDown: 1 },
     ],
     YELLOW: [
       { key: 'siphon', name: '흡성소법', cost: 1, damage: 7, block: 0, count: 3, hpCost: 1, lifesteal: 35 },
@@ -232,11 +232,11 @@ const TS_DATA = {
         { key: 'steel_counter', name: '금강반탄', cost: 3, damage: 19, block: 8, counter: 6 },
         { key: 'rampart_strike', name: '벽력금강', cost: 3, damage: 5, block: 6, blockToDamage: 1 },
         { key: 'lion_roar', name: '사자후', cost: 2, damage: 0, block: 6, surge: 3 },
-        { key: 'break_palm', name: '파계장', cost: 3, damage: 10, block: 0, breakThresholdDown: 2 },
+        { key: 'break_palm', name: '파계장', cost: 3, damage: 10, block: 0, breakThresholdDown: 1 },
       ],
       3: [
         { key: 'absolute_guard', name: '부동명왕', cost: 3, damage: 0, block: 20 },
-        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 16, breakThresholdDown: 4 },
+        { key: 'threshold_collapse', name: '멸계진언', cost: 4, damage: 0, block: 16, breakThresholdDown: 2 },
         { key: 'anchor_finish', name: '금강멸적', cost: 5, damage: 39, block: 10 },
         { key: 'fortress', name: '철옹금성', cost: 4, damage: 0, block: 26, counter: 10 },
         { key: 'crush', name: '항마멸쇄', cost: 6, damage: 47, block: 8 },
@@ -293,11 +293,11 @@ const TS_DATA = {
     calc_boost: { damage: 11 }, delay_loop: { block: 12 },
     deflect: { evade: 2 }, cloud_step: { evade: 2 }, redirect: { evade: 3 },
     memflush: { discardAll: 7 },
-    chain: { damage: 9 }, overload_info: { damage: 4 },
-    guard: { block: 12 }, anchor: { damage: 13, block: 5 }, fortify: { block: 7 },
+    chain: { damage: 15 }, overload_info: { damage: 7 },
+    guard: { block: 12 }, anchor: { damage: 17, block: 5 }, fortify: { block: 7 },
     ironwall: { block: 10 }, shield_bash: { damage: 5 }, counter_stance: { counter: 8 },
     check_strike: { damage: 11 },
-    reboot: { counter: 9 }, threshold: { breakThresholdDown: 3 },
+    reboot: { counter: 9 }, threshold: { breakThresholdDown: 2 },
     siphon: { damage: 10 }, firstaid: { heal: 9 }, corrode: { damage: 8 },
     drain_wave: { damage: 20 },
     bloodsuck: { damage: 9 }, life_cycle: { heal: 9 }, endure: { damage: 13 },

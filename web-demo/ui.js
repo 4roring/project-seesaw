@@ -63,12 +63,12 @@ const TS_UI = (() => {
       { key: 'heal', label: '회복', text: (v) => `체력 ${v} 회복` },
       { key: 'draw', label: '드로우', text: (v) => `카드 ${v}장 드로우` },
       { key: 'rewind', label: '되감기', text: (v) => `기세 ${v} 되감기` },
-      { key: 'counter', label: '반탄', text: (v) => `다음 피격 시 반탄 ${v}` },
+      { key: 'counter', label: '반탄', text: (v) => `적 페이즈 동안 피격마다 반탄 ${v}` },
       { key: 'evade', label: '흘리기', text: (v) => `다음 피격 ${v}회를 흘려보냄` },
     { key: 'sealSkill', label: '점혈', text: (v) => `적의 가장 비싼 초식을 ${v}합간 봉인` },
     { key: 'drainPower', label: '공력 흡수', text: (v) => `적이 쌓은 공격력 ${v} 감소` },
     { key: 'surge', label: '몰아치기', text: (v) => `기세를 쓰지 않고 몰아치기 +${v}` },
-      { key: 'breakThresholdDown', label: '빈틈 감소', text: (v) => `이번 전투 빈틈 ${v} 감소` },
+      { key: 'breakThresholdDown', label: '빈틈 감소', text: (v) => `이번 합 빈틈 ${v} 감소` },
     ];
 
     const FLAGS = [
@@ -242,7 +242,7 @@ const TS_UI = (() => {
     const el = els['surge-meter'];
     if (!el) return;
     const spent = g.momentumSpentThisTurn;
-    const need = g.breakThreshold;
+    const need = TS_Engine.effectiveBreakThreshold(g);
     const pct = Math.min(100, Math.round((spent / need) * 100));
     el.className = 'surge-meter' + (spent >= need ? ' ready' : '');
     el.innerHTML = `<span class="surge-label">몰아치기</span>`
@@ -267,13 +267,14 @@ const TS_UI = (() => {
     const style = g.closerStyle === 'CRAFTY'
       ? { name: '노회', hint: '마무리로 가장 싼 초식 — 얕게 넘겨도 크게 안 돌아온다' }
       : { name: '패도', hint: '마무리로 가장 비싼 초식 — 크게 맞고 크게 돌려받는다' };
-    const need = Math.max(0, g.breakThreshold - g.momentumSpentThisTurn);
+    const eff = TS_Engine.effectiveBreakThreshold(g);
+    const need = Math.max(0, eff - g.momentumSpentThisTurn);
     const head = document.createElement('div');
     head.className = 'boss-style-row';
-    head.innerHTML = `<b>빈틈 ${g.breakThreshold}</b> · <b>${style.name}</b>`
+    head.innerHTML = `<b>빈틈 ${eff}${eff !== g.breakThreshold ? ` (원래 ${g.breakThreshold})` : ''}</b> · <b>${style.name}</b>`
       + `<span class="boss-style-hint">${style.hint}</span>`
-      + `<span class="boss-style-hint">한 합에 틈 ${g.breakThreshold}을 몰아치면 파훼`
-      + (need > 0 ? ` — 지금 ${g.momentumSpentThisTurn}/${g.breakThreshold}` : ' — <b>완성!</b>')
+      + `<span class="boss-style-hint">한 합에 틈 ${eff}을 몰아치면 파훼`
+      + (need > 0 ? ` — 지금 ${g.momentumSpentThisTurn}/${eff}` : ' — <b>완성!</b>')
       + `</span>`;
     els['boss-skill-legend'].appendChild(head);
 

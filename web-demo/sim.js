@@ -31,7 +31,7 @@ window.TS_Sim = (() => {
     // 방어도/회복을 피해의 0.6배로 보던 초기 가중치는 방어형 컬러를 구조적으로
     // 과소평가했다. 실측상 백(피해 절반, 도달 9.8)이 증명하듯 경감은 피해와
     // 거의 동등한 가치라, 1.0으로 맞춰야 컬러 비교가 공정해진다.
-    v += (c.block || 0) * 1.0 + (c.heal || 0) * 1.0 + (c.draw || 0) * 4 + (c.counter || 0) * 1.2;
+    v += (c.block || 0) * 1.0 + (c.heal || 0) * 1.0 + (c.draw || 0) * 4 + (c.counter || 0) * 2.2 /* 적 페이즈당 2~4회 발동 */;
     if (c.lifesteal) v += (c.damage || 0) * c.lifesteal / 100;
     if (c.evade) v += c.evade * 7; // 일격 하나를 통째로 넘기는 값어치
     // B라인 필드 (gdd/03 3-2). 여기 빠져 있으면 점수가 0이 되고, 문파 방문
@@ -128,7 +128,7 @@ window.TS_Sim = (() => {
       let best = null, bv = -1, bestBreaks = false;
       g.hand.filter((c) => usable(g, c)).forEach((c) => {
         // 파훼는 착지 위치가 아니라 이번 합의 몰아치기 총량으로 난다
-        const breaks = g.momentumSpentThisTurn + cost(g, c) >= g.breakThreshold;
+        const breaks = g.momentumSpentThisTurn + cost(g, c) >= E.effectiveBreakThreshold(g);
         let v = (c.damage || 0)
           + (c.chain ? c.chain * g.cardsPlayedThisTurn : 0)
           + (c.discardAll ? c.discardAll * (g.hand.length - 1) : 0)
@@ -374,5 +374,52 @@ window.TS_Sim = (() => {
     };
   }
 
-  return { run, score };
+  // ── 데이터 점검 ─────────────────────────────────────────────
+  // 조용히 틀리는 것들만 본다. 강화가 카드를 약하게 만드는 실수는 화면에
+  // 아무 경고도 남기지 않는다 — 금강저의 피해를 11 → 14로 올렸을 때
+  // 강화표(13)를 같이 안 고쳐서 실제로 한 번 생겼다.
+  function lint() {
+    const problems = [];
+    const D2 = TS_DATA;
+    const all = [];
+    Object.entries(D2.STARTER_DECKS).forEach(([col, cards]) =>
+      cards.forEach((c) => all.push({ col, c, where: '시작 덱' })));
+    Object.entries(D2.REWARD_POOLS).forEach(([col, tiers]) =>
+      Object.entries(tiers).forEach(([t, cards]) =>
+        cards.forEach((c) => all.push({ col, c, where: `보상 티어${t}` }))));
+
+    // 1) 강화가 어떤 수치도 낮추면 안 된다
+    const LOWER_IS_BETTER = new Set(['cost', 'hpCost']);
+    all.forEach(({ col, c, where }) => {
+      const patch = D2.UPGRADES[c.key];
+      if (!patch) return;
+      Object.entries(patch).forEach(([k, v]) => {
+        const base = c[k];
+        if (typeof base !== 'number' || typeof v !== 'number') return;
+        const worse = LOWER_IS_BETTER.has(k) ? v > base : v < base;
+        if (worse) problems.push(`${col} ${where} · ${c.name}(${c.key}): 강화하면 ${k} ${base} → ${v}로 나빠짐`);
+      });
+    });
+
+    // 2) 되감기 불변 규칙 — cost - rewind >= 1 (소멸 카드는 예외)
+    all.forEach(({ col, c, where }) => {
+      if (c.rewind && !c.exhaust && c.cost - c.rewind < 1) {
+        problems.push(`${col} ${where} · ${c.name}: cost(${c.cost}) - rewind(${c.rewind}) < 1 — 무한 루프`);
+      }
+    });
+
+    // 3) score()가 0점으로 보는 필드가 있는가 — 빠진 필드는 "버려도 되는
+    //    카드"라는 뜻이 되어 교환·보상 통계를 통째로 뒤튼다
+    const KNOWN = new Set(['key','name','cost','count','desc','upgraded','unique','exhaust',
+      'effect','persistentPayload','damage','block','heal','draw','rewind','counter','evade',
+      'lifesteal','chain','chainBlock','discardAll','blockToDamage','hpCost','bossWeaken',
+      'breakThresholdDown','deepStrike','rageScale','surge','sealSkill','drainPower']);
+    const unseen = new Set();
+    all.forEach(({ c }) => Object.keys(c).forEach((k) => { if (!KNOWN.has(k)) unseen.add(k); }));
+    unseen.forEach((k) => problems.push(`점수 함수가 모르는 필드: ${k} — sim.js score()에 넣으세요`));
+
+    return problems.length ? problems : ['이상 없음'];
+  }
+
+  return { run, score, lint };
 })();
