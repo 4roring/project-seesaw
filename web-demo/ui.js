@@ -15,6 +15,7 @@ const TS_UI = (() => {
       'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'intent-preview', 'boss-skill-legend',
       'surge-meter',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
+      'log-fold', 'log-last',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
       'screen-weapon', 'weapon-sub', 'weapon-grid', 'skip-weapon-btn', 'weapon-strip',
       'screen-crossroad', 'crossroad-sub', 'crossroad-grid',
@@ -240,6 +241,9 @@ const TS_UI = (() => {
       els['log-panel'].appendChild(div);
     });
     els['log-panel'].scrollTop = els['log-panel'].scrollHeight;
+    // 접혀 있을 때도 마지막 한 줄은 보여야 한다 — 무슨 일이 일어났는지
+    // 모른 채 접힌 상자만 남으면 접은 게 아니라 가린 것이다.
+    els['log-last'].textContent = g.log[g.log.length - 1] || '기록';
 
     playPendingFx(g);
   }
@@ -266,6 +270,17 @@ const TS_UI = (() => {
     container.appendChild(span);
   }
 
+  // 좁은 화면에서만 접어 둔다. details의 open은 CSS로 제어할 수 없어
+  // 여기서 정한다. 전투 화면은 매 입력마다 다시 그리므로, 사용자가 편
+  // 것을 기억하지 않으면 펼치는 즉시 도로 접힌다.
+  const foldState = {};
+  function foldOpen(key) {
+    return foldState[key] == null ? window.innerWidth > 480 : foldState[key];
+  }
+  function rememberFold(key, el) {
+    el.addEventListener('toggle', () => { foldState[key] = el.open; });
+  }
+
   function renderSkillLegend(g) {
     els['boss-skill-legend'].innerHTML = '';
 
@@ -278,21 +293,35 @@ const TS_UI = (() => {
     const need = Math.max(0, eff - g.momentumSpentThisTurn);
     const head = document.createElement('div');
     head.className = 'boss-style-row';
-    head.innerHTML = `<b>빈틈 ${eff}${eff !== g.breakThreshold ? ` (원래 ${g.breakThreshold})` : ''}</b> · <b>${style.name}</b>`
+    // 한 줄로 묶는다 — .boss-style-row가 세로 flex라, <b> 사이의 맨
+    // 텍스트 " · "를 그냥 두면 좁은 화면에서 점만 있는 빈 줄이 생긴다.
+    head.innerHTML = `<span class="boss-style-id"><b>빈틈 ${eff}${eff !== g.breakThreshold ? ` (원래 ${g.breakThreshold})` : ''}</b> · <b>${style.name}</b></span>`
       + `<span class="boss-style-hint">${style.hint}</span>`
       + `<span class="boss-style-hint">한 합에 틈 ${eff}을 몰아치면 파훼`
       + (need > 0 ? ` — 지금 ${g.momentumSpentThisTurn}/${eff}` : ' — <b>완성!</b>')
       + `</span>`;
     els['boss-skill-legend'].appendChild(head);
 
+    // 초식 목록은 "가끔 확인하는 참고 정보"라 좁은 화면에서는 접는다.
+    // 매 합 보고 결정하는 정보(빈틈·클로저 성격·몰아치기)는 위에 그대로
+    // 남긴다 — 그걸 접으면 적의 개성이 있으나 마나가 된다 (gdd/10 10-1).
+    const box = document.createElement('details');
+    box.className = 'skill-fold';
+    box.open = foldOpen('skills');
+    rememberFold('skills', box);
+    const sum = document.createElement('summary');
+    const ready = g.enemySkills.filter((s) => !(g.bossCooldowns[s.key] > 0)).length;
+    sum.textContent = `적 초식 ${g.enemySkills.length} (지금 쓸 수 있는 것 ${ready})`;
+    box.appendChild(sum);
     g.enemySkills.forEach((s) => {
       const cd = g.bossCooldowns[s.key] || 0;
       const row = document.createElement('div');
       row.className = 'boss-skill-row' + (cd > 0 ? ' locked' : '');
       const cdText = cd > 0 ? ` · 재사용까지 ${cd}합` : (s.cooldown > 0 ? ` · 쿨다운 ${s.cooldown}합` : '');
       row.textContent = `${s.name} — 틈 ${s.cost}${cdText}`;
-      els['boss-skill-legend'].appendChild(row);
+      box.appendChild(row);
     });
+    els['boss-skill-legend'].appendChild(box);
   }
 
   function renderCombo(g) {
@@ -303,6 +332,11 @@ const TS_UI = (() => {
       els['combo-dots'].appendChild(dot);
     }
   }
+
+  // 좁은 화면 판정. style.css의 미디어 쿼리(480px)와 같은 값을 써야
+  // 화면은 압축됐는데 조작은 데스크톱식인 어긋남이 안 생긴다.
+  function isNarrow() { return window.innerWidth <= 480; }
+  let selectedUid = null;
 
   function renderHand(run) {
     const g = run.game;
@@ -322,12 +356,27 @@ const TS_UI = (() => {
         div.classList.add('dragging');
       });
       div.addEventListener('dragend', () => div.classList.remove('dragging'));
-      div.addEventListener('click', () => doPlayCard(card.uid));
+      if (card.uid === selectedUid) div.classList.add('selected');
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 좁은 화면에서는 두 단계로 낸다 — 첫 탭은 고르기(설명이 펼쳐지고
+        // 카드가 커진다), 두 번째 탭이 사용이다. 손가락은 마우스보다
+        // 부정확해서 한 번 탭에 초식이 나가면 잘못 내는 일이 잦다.
+        // 넓은 화면은 예전대로 한 번에 낸다.
+        if (!isNarrow()) { doPlayCard(card.uid); return; }
+        if (selectedUid === card.uid) { selectedUid = null; doPlayCard(card.uid); return; }
+        selectedUid = card.uid;
+        render();
+      });
       els['hand-row'].appendChild(div);
     });
+    // 고른 카드가 잘려 보이면 두 번째 탭을 못 한다
+    const sel = els['hand-row'].querySelector('.card.selected');
+    if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   function doPlayCard(uid) {
+    selectedUid = null;
     const run = TS_Run.get();
     if (run.phase !== 'BATTLE') return;
     TS_Engine.playCard(run.game, uid);
@@ -656,6 +705,12 @@ const TS_UI = (() => {
     els['skip-reward-btn'].addEventListener('click', () => { TS_Run.skipReward(); resetBattleFx(); render(); });
     els['skip-weapon-btn'].addEventListener('click', () => { TS_Run.chooseWeapon(null); render(); });
 
+    // 카드 밖을 누르면 고른 것을 놓는다 — 무르는 길이 없으면 두 단계
+    // 탭이 오히려 갇힌 느낌을 준다.
+    els['screen-battle'].addEventListener('click', () => {
+      if (selectedUid) { selectedUid = null; render(); }
+    });
+
     const restart = () => { TS_Run.newRun(); fxCursor = 0; render(); };
     els['restart-btn'].addEventListener('click', restart);
     els['result-restart-btn'].addEventListener('click', restart);
@@ -664,6 +719,8 @@ const TS_UI = (() => {
   function init() {
     cacheEls();
     buildGaugeTrack();
+    els['log-fold'].open = foldOpen('log');
+    rememberFold('log', els['log-fold']);
     wireStaticEvents();
     TS_Run.newRun();
     render();

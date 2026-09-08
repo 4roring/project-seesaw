@@ -473,3 +473,115 @@ button:hover { border-color: var(--text-dim); }
 
 .crossroad-card.node-tomb { border-color: rgba(77, 155, 230, 0.3); }
 .crossroad-card.node-tomb .cr-detail { color: var(--gauge-e-safe); }
+
+/* ══════════════════════════════════════════════════════════════
+   모바일 (≤480px)
+   실측: 375x812에서 문서가 1302px — 한 화면보다 490px 넘쳤다.
+   가장 큰 원인은 손패였다. .hand-row가 flex-wrap이라 카드가 늘수록
+   세로로 무한정 자란다(4장 2줄 294px, 7장이면 3줄 440px). 흑(무당)처럼
+   패가 쌓이는 문파에서 특히 심하다.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  body { padding: 10px 8px; }
+  .screen { gap: 8px; }
+  .panel { padding: 10px; }
+
+  /* ① 손패는 한 줄에 고정하고 가로로 넘긴다 — 장수와 무관하게 높이가
+     일정해지는 것이 핵심이다. 잘린 카드가 살짝 보이게 두어 더 있다는
+     것을 알린다. */
+  .hand-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 0;
+    gap: 6px;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .hand-row::-webkit-scrollbar { height: 3px; }
+  .hand-row::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+  .card {
+    width: 84px; height: 96px;
+    flex: 0 0 auto;
+    padding: 6px;
+    scroll-snap-align: start;
+  }
+  .card-cost { width: 18px; height: 18px; font-size: 11px; }
+  .card-name { font-size: 11.5px; line-height: 1.25; }
+  .card-desc {
+    font-size: 9.5px; line-height: 1.25;
+    /* 좁은 카드에서 설명이 넘치면 카드가 아니라 줄이 깨진다 */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  /* 손가락에는 hover가 없다 — 뜬 채로 남아 겹쳐 보인다 */
+  .card:hover { transform: none; box-shadow: none; }
+
+  /* ④ 죽은 공간 정리.
+     드롭존은 모바일에서 통째로 무의미하다 — HTML5 드래그 앤 드롭은
+     터치에서 동작하지 않으므로 "드래그해 사용"은 되지도 않는 안내이고,
+     49px을 차지한다. 탭으로 내는 길은 그대로 열려 있다. */
+  .play-zone { display: none; }
+
+  /* 힌트 문구는 규칙을 처음 배울 때만 필요하다. 매 합 읽는 정보(연환
+     점, 몰아치기 수치)는 남기고 설명문만 접는다. */
+  .combo-hint, .surge-hint { display: none; }
+  .combo-row { gap: 8px; font-size: 11px; }
+  .surge-meter { margin: 0; padding: 5px 8px; }
+
+  /* 무대는 아바타를 줄이고 여백을 좁힌다 */
+  .arena { gap: 8px; padding: 10px; }
+  .fighter .avatar { font-size: 34px; }
+  .fighter-name { font-size: 12px; }
+}
+
+/* ③ 접이식 참고 정보 (적 초식 목록 · 기록).
+   좁은 화면에서만 접힌다 — ui.js의 foldOpen()이 폭을 보고 정한다.
+   CSS로는 details의 open을 건드릴 수 없다. */
+.skill-fold, .log-fold { border: none; }
+.skill-fold > summary, .log-summary {
+  cursor: pointer; list-style: none;
+  font-size: 11px; color: var(--text-dim);
+  padding: 4px 0;
+}
+.skill-fold > summary::-webkit-details-marker,
+.log-summary::-webkit-details-marker { display: none; }
+.skill-fold > summary::before, .log-summary::before {
+  content: '▸ '; display: inline-block; transition: transform 0.15s ease;
+}
+.skill-fold[open] > summary::before, .log-fold[open] .log-summary::before {
+  content: '▾ ';
+}
+.skill-fold > summary:hover, .log-summary:hover { color: var(--text); }
+/* 접혔을 때 마지막 한 줄은 잘라서라도 보여준다 */
+.log-summary {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.log-fold[open] .log-summary { color: var(--text); }
+
+/* ② 좁은 화면의 두 단계 탭 — 고른 카드만 펼쳐서 크게 보여준다.
+   고르는 것과 내는 것을 나누면 오터치로 초식이 나가는 일이 줄고,
+   작아진 카드에서 못 읽던 설명을 이때 다 보여줄 수 있다. */
+@media (max-width: 480px) {
+  .card.selected {
+    width: 132px; height: auto; min-height: 96px;
+    border-color: var(--break);
+    box-shadow: 0 0 0 2px rgba(255, 210, 77, 0.35);
+    z-index: 2;
+  }
+  .card.selected .card-name { font-size: 13px; }
+  .card.selected .card-desc {
+    font-size: 11px;
+    -webkit-line-clamp: unset; /* 고른 카드는 설명을 자르지 않는다 */
+    display: block; overflow: visible;
+  }
+  .card.selected::after {
+    content: '한 번 더 눌러 사용';
+    display: block; margin-top: 6px; padding-top: 5px;
+    border-top: 1px dashed rgba(255, 210, 77, 0.4);
+    font-size: 10px; color: var(--break); text-align: center;
+  }
+}
