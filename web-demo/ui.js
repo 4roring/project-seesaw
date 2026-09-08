@@ -129,8 +129,12 @@ const TS_UI = (() => {
         <div class="deck-desc">${info.desc}</div>
         <div class="deck-list">${list}</div>`;
       div.addEventListener('click', () => {
+        // 문파를 고른다고 곧장 전투가 시작되지는 않는다 — 신병이기를 먼저
+        // 고른다(gdd/14). game이 아직 없을 수 있으므로 반드시 가드가 있는
+        // resetBattleFx를 쓴다. 예전엔 game.fx를 바로 읽어서, 무기 선택이
+        // 끼어든 뒤로 문파를 누르면 여기서 터지고 화면이 안 넘어갔다.
         TS_Run.chooseDeck(key);
-        fxCursor = TS_Run.get().game.fx.length; // 시작 로그의 fx는 재생하지 않음
+        resetBattleFx(); // 시작 로그의 fx는 재생하지 않음
         render();
       });
       els['deck-grid'].appendChild(div);
