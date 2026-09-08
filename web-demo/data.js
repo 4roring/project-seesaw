@@ -498,6 +498,57 @@ const TS_DATA = {
   },
 
   // ─────────────────────────────────────────────────────────────
+  // 유물 (gdd/15-relics.md) — 강호행의 규칙을 비트는 물건.
+  //
+  // ⚠️ 무기와 층이 달라야 한다. 무기(gdd/14)는 **한 합 안의** 규칙을
+  // 비틀고, 유물은 **걸음과 보상의** 규칙을 비튼다. 둘이 같은 층을
+  // 건드리면 이름만 다른 같은 시스템이 된다.
+  //
+  // ⚠️ "선이 넘어가는 판정선을 옮기는" 계열은 접었다. 실측상 최적
+  // 플레이의 85%가 적1~적2에 마감하므로(시소 원리가 살아 있다는 뜻),
+  // 판정선을 건드리면 이 게임에서 가장 자주 내리는 결정을 통째로
+  // 무력화한다. 정밀 착지 축은 이미 검(劍)이 쓰고 있기도 하다.
+  // ─────────────────────────────────────────────────────────────
+  RELICS_ENABLED: true,
+  RELIC_SLOTS: 3,
+  RELICS: {
+    chronicle: {
+      key: 'chronicle', name: '이문록(異聞錄)', icon: '📖',
+      flavor: '강호의 소문을 적어 둔 낡은 책자.',
+      rule: '늘 다음 두 상대의 빈틈과 성격을 안다',
+      // 주루가 팔던 정보를 상시화한다 — 정보 비대칭 규칙 자체를 바꾼다
+      alwaysIntel: true,
+    },
+    stride: {
+      key: 'stride', name: '축지부(縮地符)', icon: '👣',
+      flavor: '땅을 접어 걷는다는 부적.',
+      rule: '갈림길에서 두 걸음을 딛는다 — 대신 다음 갈림길은 건너뛴다',
+      // 걸음 수는 그대로지만 3+3 중 둘을 고르게 되므로 선택의 폭이 는다
+      doubleStep: true,
+    },
+    mirror: {
+      key: 'mirror', name: '호심경(護心鏡)', icon: '🪞',
+      flavor: '심장 앞에 걸어 두는 구리 거울.',
+      rule: '쓰러질 때 한 번, 체력 1로 버틴다 (강호행에 한 번)',
+      lastStand: 1,
+    },
+    stele: {
+      key: 'stele', name: '오도비(悟道碑)', icon: '🪨',
+      flavor: '깨달은 자가 새겨 둔 비석.',
+      rule: '파훼할 때마다 최대 체력이 3 늘어난다',
+      // 전투에서 일어난 사건을 강호행의 성장으로 옮긴다
+      breakGrowth: 3,
+    },
+    seal: {
+      key: 'seal', name: '각인석(刻印石)', icon: '🔖',
+      flavor: '익힌 것을 몸에 새기는 돌.',
+      rule: '전리품을 거두지 않으면 대신 초식 하나를 연마한다',
+      // "안 받는다"를 실제 선택지로 만든다 — 덱을 얇게 유지하는 길이 열린다
+      refuseUpgrade: true,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────
   // 걸음의 종류 (gdd/13-crossroads.md 13-2)
   //
   // needsChoice가 true면 걸음을 고른 뒤 한 번 더 고른다. 그래야 "수련장에
@@ -522,6 +573,11 @@ const TS_DATA = {
     FORTUNE: {
       key: 'FORTUNE', name: '기연(奇緣)', icon: '✨',
       blurb: '무엇이 기다리는지는 닿아 보아야 안다.',
+      needsChoice: true,
+    },
+    TOMB: {
+      key: 'TOMB', name: '고묘(古墓)', icon: '🏚',
+      blurb: '무너진 옛 무덤. 누군가 지니던 물건이 남아 있다.',
       needsChoice: true,
     },
     ELITE: {
@@ -565,6 +621,15 @@ const TS_DATA = {
       cost: '최대 체력 10을 영구히 잃습니다',
       apply: (run) => { run.playerMaxHp -= 10; run.playerHp = Math.min(run.playerHp, run.playerMaxHp); },
       available: (run) => run.playerMaxHp > 40,
+    },
+    {
+      key: 'relic_find', name: '기물(奇物)', icon: '🏺',
+      story: '무너진 사당 아래 오래된 물건이 묻혀 있습니다.',
+      gain: '유물 하나',
+      cost: '유물 자리가 다 찼다면 지니던 것을 버려야 합니다',
+      apply: () => {},
+      available: (run) => TS_DATA.RELICS_ENABLED
+        && Object.keys(TS_DATA.RELICS).some((k) => !run.relics.includes(k)),
     },
     {
       key: 'relic_blade', name: '신병이기(神兵利器)', icon: '🗡',

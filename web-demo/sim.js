@@ -248,7 +248,12 @@ window.TS_Sim = (() => {
     if (key === 'SECT_VISIT') return 50;
     // 비무대회는 유일하게 죽을 수 있는 걸음이다 — 여유가 있을 때만
     if (key === 'ELITE') return hp > 0.85 ? 58 : 4;
-    if (key === 'FORTUNE') return 38;
+    // 고묘 — 유물 자리. 위험이 없으므로 여유가 있을 때 우선한다
+    if (key === 'TOMB') return hp > 0.6 ? 54 : 20;
+    // 기연은 대가가 붙지만 여유가 있으면 걸어 볼 만하다. 38로 두었더니
+    // 늘 곁에 있는 수련장(45+)에 밀려 탐욕 정책이 런당 0.00회 골랐고,
+    // 그 바람에 기연 4종이 통계에서 통째로 빠져 있었다.
+    if (key === 'FORTUNE') return hp > 0.75 ? 52 : 18;
     return 0;
   }
 
@@ -300,11 +305,12 @@ window.TS_Sim = (() => {
     }
 
     if (st.node.key === 'FORTUNE') {
-      // 무기 제안 — 빈손이면 쥐고, 손이 차 있으면 바꾸지 않는다.
-      // (무기끼리의 우열은 아직 데이터가 없어 AI가 판단할 근거가 없다)
-      const take = live.find((o) => o.id.startsWith('wtake:'));
+      // 병기·유물 제안 — 자리가 비면 받고, 차 있으면 바꾸지 않는다.
+      // (서로의 우열은 아직 데이터가 없어 AI가 판단할 근거가 없다)
+      const take = live.find((o) => o.id.startsWith('wtake:') || o.id.startsWith('rtake:'));
       if (take) return take.id;
       if (live.some((o) => o.id.startsWith('wswap:'))) return 'wleave';
+      if (live.some((o) => o.id.startsWith('rswap:'))) return 'rleave';
       const forget = live.filter((o) => o.id.startsWith('forget:'));
       if (forget.length) {
         // 덜어낼 것은 가장 값 없는 초식
@@ -326,6 +332,8 @@ window.TS_Sim = (() => {
     // 무기를 고정해 한 자루씩 재기 위한 손잡이. null이면 맨손,
     // 'random'이면 무작위. 색 × 무기 20조합을 하나씩 가르려면 필요하다.
     const weapon = opts && opts.weapon;
+    // 유물도 한 개씩 고정해 잰다 — 무기와 같은 이유다 (gdd/14-6).
+    const relic = opts && opts.relic;
     const casual = !!(opts && opts.casual);
     const search = !!(opts && opts.search);
     const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
@@ -333,6 +341,13 @@ window.TS_Sim = (() => {
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
       R.newRun(); R.chooseDeck(color);
+      if (relic) {
+        const st0 = R.get();
+        st0.relics = relic === 'random'
+          ? [Object.keys(TS_DATA.RELICS)[Math.floor(Math.random() * Object.keys(TS_DATA.RELICS).length)]]
+          : [relic];
+        st0.lastStandLeft = st0.relics.reduce((n, k) => n + (TS_DATA.RELICS[k].lastStand || 0), 0);
+      }
       if (R.get().phase === 'WEAPON') {
         let pick = null;
         if (weapon === 'random') {
@@ -354,6 +369,17 @@ window.TS_Sim = (() => {
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
           const o = st.rewardOptions.slice();
+          // 각인석(gdd/15)이 있으면 "안 받는다"가 실제 선택지가 된다 —
+          // 제시된 카드가 지금 덱의 중간값보다 못하면 연마를 택한다.
+          // 이 판단을 안 넣으면 유물이 한 번도 발동하지 않아 통계에서
+          // 통째로 사라진다.
+          const sealed = R.hasRelic && R.hasRelic('refuseUpgrade');
+          if (sealed && o.length && !casual) {
+            const best = Math.max(...o.map((c) => score(st.game, c)));
+            const deckScores = st.deck.map((c) => score(st.game, c)).sort((a, b) => a - b);
+            const median = deckScores[Math.floor(deckScores.length / 2)] || 0;
+            if (best < median) { R.skipReward(); continue; }
+          }
           // 초심자는 보상도 아무거나 고른다
           if (casual) { if (o.length) R.takeCard(o[Math.floor(Math.random() * o.length)]); else R.skipReward(); }
           else { o.sort((a, b) => score(st.game, b) - score(st.game, a));
@@ -384,6 +410,7 @@ window.TS_Sim = (() => {
       color,
       policy: search ? '탐색' : casual ? '초심자' : planned ? '계획' : '탐욕',
       weapon: weapon || '맨손',
+      relic: relic || '없음',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),

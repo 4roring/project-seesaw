@@ -9,6 +9,11 @@ const TS_Run = (() => {
     color: null,
     weapons: [],       // 손에 쥔 신병이기 (키 배열). 손은 둘뿐 (gdd/14)
     weaponOffer: null, // 런 중에 제안된 무기
+    relics: [],        // 지닌 유물 (gdd/15). 강호행의 규칙을 비튼다
+    relicOffer: null,
+    lastStandLeft: 0,  // 호심경 — 전투 사이에도 이어진다
+    skipNextCrossroad: false, // 축지부 — 두 걸음을 딛은 대가
+    secondStepPending: false,
     deck: [],        // 카드 정의 배열 (1개 = 실제 카드 1장)
     stage: 1,
     playerHp: D.STARTING_PLAYER_HP,
@@ -51,6 +56,11 @@ const TS_Run = (() => {
     state.color = null;
     state.weapons = [];
     state.weaponOffer = null;
+    state.relics = [];
+    state.relicOffer = null;
+    state.lastStandLeft = 0;
+    state.skipNextCrossroad = false;
+    state.secondStepPending = false;
     state.deck = [];
     state.stage = 1;
     state.playerHp = D.STARTING_PLAYER_HP;
@@ -94,6 +104,29 @@ const TS_Run = (() => {
     startBattle();
   }
 
+  // ── 유물 (gdd/15) ───────────────────────────────────────────
+  function hasRelic(field) {
+    return state.relics.some((k) => (D.RELICS[k] || {})[field]);
+  }
+  function relicSum(field) {
+    return state.relics.reduce((n, k) => n + ((D.RELICS[k] || {})[field] || 0), 0);
+  }
+  function relicSlotsFree() { return D.RELIC_SLOTS - state.relics.length; }
+  function takeRelic(key, dropKey) {
+    if (!D.RELICS[key] || state.relics.includes(key)) return false;
+    if (dropKey) state.relics = state.relics.filter((k) => k !== dropKey);
+    if (relicSlotsFree() <= 0) return false;
+    state.relics.push(key);
+    // 호심경을 새로 얻으면 그 자리에서 바로 유효해진다
+    state.lastStandLeft = Math.max(state.lastStandLeft, relicSum('lastStand'));
+    return true;
+  }
+  function rollRelicOffer() {
+    const pool = Object.keys(D.RELICS).filter((k) => !state.relics.includes(k));
+    if (!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   // ── 신병이기 (gdd/14) ───────────────────────────────────────
   function handsUsed() {
     return state.weapons.reduce((n, k) => n + ((D.WEAPONS[k] || {}).hands || 0), 0);
@@ -132,6 +165,8 @@ const TS_Run = (() => {
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
       weapons: state.weapons,
+      relics: state.relics,
+      lastStandLeft: state.lastStandLeft,
       minReturn: state.minReturn,
     });
     state.phase = 'BATTLE';
@@ -152,6 +187,8 @@ const TS_Run = (() => {
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
       weapons: state.weapons,
+      relics: state.relics,
+      lastStandLeft: state.lastStandLeft,
       minReturn: state.minReturn,
     });
     state.phase = 'BATTLE';
@@ -169,11 +206,21 @@ const TS_Run = (() => {
     if (g.status !== 'WON') return;
 
     state.playerHp = g.playerHp; // 전투 종료 시점 체력을 이어받음
+    state.lastStandLeft = g.lastStandLeft; // 호심경은 강호행에 한 번뿐이다
+    // 오도비 — 전투에서 낸 파훼를 강호행의 성장으로 옮긴다
+    const grow = relicSum('breakGrowth') * g.breakCount;
+    if (grow > 0) {
+      state.playerMaxHp += grow;
+      state.playerHp += grow;
+      note(`오도비 — 파훼 ${g.breakCount}회로 최대 체력 +${grow}`);
+    }
 
     if (state.battleKind === 'ELITE') {
       note(`비무대회에서 ${g.enemyName}을(를) 꺾다`);
-      // 꺾은 상대의 병기를 취한다 — 덱 성장 곡선을 건드리지 않는 자리다
+      // 꺾은 상대가 지녔던 것을 취한다 — 병기이거나 유물이다.
+      // 덱 성장 곡선을 건드리지 않는 자리라 여기 둔다 (gdd/13-7).
       state.weaponOffer = D.WEAPONS_ENABLED ? rollWeaponOffer() : null;
+      state.relicOffer = D.RELICS_ENABLED ? rollRelicOffer() : null;
       state.rewardPicksLeft = D.ELITE_REWARD_CARDS;
       state.rewardOptions = rollRewards();
       state.phase = 'REWARD';
@@ -247,7 +294,21 @@ const TS_Run = (() => {
     consumeRewardPick();
   }
 
-  function skipReward() { state.rewardPicksLeft = 0; consumeRewardPick(); }
+  function skipReward() {
+    // 각인석 (gdd/15) — 거두지 않는 쪽을 실제 선택지로 만든다.
+    // 덱을 얇게 유지하면서도 성장할 길이 열린다.
+    if (hasRelic('refuseUpgrade')) {
+      const ups = upgradableIndexes();
+      if (ups.length) {
+        const i = ups[Math.floor(Math.random() * ups.length)];
+        const before = state.deck[i].name;
+        upgradeAt(i);
+        note(`각인석 — 전리품 대신 ${before}을(를) 연마`);
+      }
+    }
+    state.rewardPicksLeft = 0;
+    consumeRewardPick();
+  }
 
   function consumeRewardPick() {
     state.rewardPicksLeft -= 1;
@@ -257,12 +318,12 @@ const TS_Run = (() => {
     }
     // 엘리트를 이겨서 온 보상이면 걸음은 이미 소비했다 — 곧장 다음 비무로
     if (state.battleKind === 'ELITE') {
-      // 꺾은 상대의 병기가 있으면 먼저 묻는다
-      if (state.weaponOffer) {
-        const offer = state.weaponOffer;
-        state.weaponOffer = null;
-        state.node = { key: 'FORTUNE', fortune: 'relic_blade' };
-        state.nodeView = weaponOfferView(offer, '비무대회 — 꺾은 자의 병기');
+      // 꺾은 상대가 지녔던 것 — 병기와 유물을 함께 놓고 하나를 고른다.
+      // 둘을 차례로 물으면 "둘 다 받는" 것이 되어 대회 보상이 너무 커진다.
+      if (state.weaponOffer || state.relicOffer) {
+        state.nodeView = spoilsView(state.weaponOffer, state.relicOffer);
+        state.weaponOffer = null; state.relicOffer = null;
+        state.node = { key: 'TOMB' }; // 선택지 처리기를 공유한다
         state.phase = 'NODE';
         return;
       }
@@ -285,6 +346,9 @@ const TS_Run = (() => {
 
   function rollCrossroad() {
     const rest = ['TAVERN', 'SECT_VISIT', 'ELITE'];
+    // 고묘 — 유물이 나오는 자리. 이게 없으면 런의 77%가 유물을 한 번도
+    // 못 본다(실측). 시스템을 만들어 놓고 안 보이게 두면 없는 것과 같다.
+    if (D.RELICS_ENABLED && rollRelicOffer()) rest.push('TOMB');
     if (state.fortuneUsed < D.FORTUNE_MAX_PER_RUN && availableFortunes().length) rest.push('FORTUNE');
     if (D.CROSSROAD_ALWAYS_TRAINING) {
       // 수련장은 늘 열어 둔다. 회복과 연마가 둘 다 여기 있어서, 이 걸음에
@@ -300,6 +364,13 @@ const TS_Run = (() => {
 
   function openCrossroad() {
     if (!D.CROSSROAD_ENABLED) { advanceStage(); return; }
+    // 축지부 (gdd/15) — 지난번에 두 걸음을 딛었으면 이번은 건너뛴다
+    if (state.skipNextCrossroad) {
+      state.skipNextCrossroad = false;
+      state.nodeResult = '축지부 — 땅을 접어 건너뜁니다.';
+      advanceStage();
+      return;
+    }
     state.crossroad = rollCrossroad();
     state.node = null;
     state.nodeView = null;
@@ -311,6 +382,13 @@ const TS_Run = (() => {
     state.node = { key };
     if (key === 'ELITE') { note('비무대회에 나서다'); startEliteBattle(); return; }
     if (key === 'TAVERN') { resolveTavern(); return; }
+    if (key === 'TOMB') {
+      const offer = rollRelicOffer();
+      if (!offer) { finishNode('고묘 — 남은 것이 없습니다.'); return; }
+      state.nodeView = relicOfferView(offer, '고묘(古墓)');
+      state.phase = 'NODE';
+      return;
+    }
     if (key === 'TRAINING') { state.nodeView = trainingView(); }
     else if (key === 'SECT_VISIT') { state.nodeView = sectVisitView(); }
     else if (key === 'FORTUNE') { state.nodeView = fortuneView(); }
@@ -397,6 +475,52 @@ const TS_Run = (() => {
 
   function fortuneDef(key) { return D.FORTUNES.find((f) => f.key === key); }
 
+  // 비무대회의 전리 — 병기와 유물을 한 화면에 놓고 하나만 고르게 한다.
+  function spoilsView(weaponKey, relicKey) {
+    const options = [];
+    if (weaponKey) {
+      const w = D.WEAPONS[weaponKey];
+      const canTake = w.hands <= handsFree();
+      options.push({
+        id: canTake ? `wtake:${weaponKey}` : `wswap:${weaponKey}:${state.weapons.join('+')}`,
+        name: `${w.icon} ${w.name}`, tag: canTake ? `${w.hands}손` : '교체',
+        desc: `${w.rule}\n${canTake ? w.flavor : '쥐던 것을 놓습니다: ' + state.weapons.map((k) => D.WEAPONS[k].name).join(' · ')}`,
+      });
+    }
+    if (relicKey) {
+      const rl = D.RELICS[relicKey];
+      const canTake = relicSlotsFree() > 0;
+      options.push({
+        id: canTake ? `rtake:${relicKey}` : `rswap:${relicKey}:${state.relics[0]}`,
+        name: `${rl.icon} ${rl.name}`, tag: canTake ? '유물' : '교체',
+        desc: `${rl.rule}\n${canTake ? rl.flavor : '버립니다: ' + D.RELICS[state.relics[0]].name}`,
+      });
+    }
+    options.push({ id: 'rleave', name: '아무것도 취하지 않는다', tag: '거절',
+      desc: '꺾은 것으로 족합니다.' });
+    return { title: '비무대회 — 꺾은 자의 유품', sub: '하나만 취할 수 있습니다.', options };
+  }
+
+  // 유물 제안. 자리가 비면 지니고, 다 찼으면 무엇을 버릴지 고른다.
+  function relicOfferView(key, title) {
+    const rl = D.RELICS[key];
+    const options = [];
+    if (relicSlotsFree() > 0) {
+      options.push({ id: `rtake:${key}`, name: `${rl.icon} ${rl.name}을(를) 지닌다`,
+        tag: '획득', desc: `${rl.rule}\n${rl.flavor}` });
+    } else {
+      state.relics.forEach((k) => {
+        const cur = D.RELICS[k];
+        options.push({ id: `rswap:${key}:${k}`, name: `${cur.name}을(를) 버리고 ${rl.name}을(를) 지닌다`,
+          tag: '교체', desc: `버리는 것: ${cur.rule}\n지니는 것: ${rl.rule}` });
+      });
+    }
+    options.push({ id: 'rleave', name: '그냥 지나간다', tag: '거절',
+      desc: relicSlotsFree() > 0 ? '손대지 않는 편이 나을 수도 있습니다.'
+        : '지니던 것을 버릴 이유가 없습니다.' });
+    return { title, sub: `${rl.icon} ${rl.name} — ${rl.rule}`, options };
+  }
+
   // 무기 제안. 손이 비어 있으면 쥐거나 지나가고, 다 찼으면 무엇을 놓을지
   // 고른다 — 버리는 것이 있어야 무기 교체에 무게가 생긴다 (gdd/14 14-5).
   function weaponOfferView(key, title) {
@@ -423,7 +547,8 @@ const TS_Run = (() => {
       }
     }
     options.push({ id: 'wleave', name: '그냥 지나간다', tag: '거절',
-      desc: '손에 익은 것을 놓을 이유가 없습니다.' });
+      desc: handsFree() > 0 ? '지금 병기가 손에 맞습니다.'
+        : '손에 익은 것을 놓을 이유가 없습니다.' });
     return { title, sub: `${w.icon} ${w.name} — ${w.rule}`, options };
   }
 
@@ -442,6 +567,12 @@ const TS_Run = (() => {
     }
     if (key === 'manual') {
       return `${f.name} — 구결을 얻었습니다. 수련장에서 익혀야 합니다.`;
+    }
+    if (key === 'relic_find') {
+      const offer = rollRelicOffer();
+      if (!offer) return `${f.name} — 이미 모든 유물을 지녔습니다.`;
+      state.nodeView = relicOfferView(offer, '기연 — 기물');
+      return null;
     }
     if (key === 'relic_blade') {
       const offer = rollWeaponOffer();
@@ -514,7 +645,7 @@ const TS_Run = (() => {
       }
     }
 
-    if (key === 'FORTUNE') {
+    if (key === 'FORTUNE' || key === 'TOMB') {
       if (id === 'refuse') { finishNode('기연을 지나쳤습니다.'); return; }
       if (id === 'accept') {
         const line = applyFortune(state.node.fortune);
@@ -522,6 +653,20 @@ const TS_Run = (() => {
         finishNode(line);
         return;
       }
+      if (id.startsWith('rtake:')) {
+        const k = id.slice(6);
+        takeRelic(k);
+        finishNode(`기물 — ${D.RELICS[k].name}을(를) 손에 넣었습니다.`);
+        return;
+      }
+      if (id.startsWith('rswap:')) {
+        const [, k, drop] = id.split(':');
+        const dropped = D.RELICS[drop].name;
+        takeRelic(k, drop);
+        finishNode(`기물 — ${dropped}을(를) 버리고 ${D.RELICS[k].name}을(를) 지녔습니다.`);
+        return;
+      }
+      if (id === 'rleave') { finishNode('기물을 그대로 두고 지나쳤습니다.'); return; }
       if (id.startsWith('wtake:')) {
         const k = id.slice(6);
         takeWeapon(k);
@@ -585,6 +730,22 @@ const TS_Run = (() => {
   function finishNode(line) {
     state.nodeResult = line;
     if (line) note(line);
+    // 축지부 (gdd/15) — 한 갈림길에서 두 걸음을 딛는다. 걸음 총량은
+    // 그대로지만(다음 갈림길을 건너뛰므로) 여섯 후보 중 둘을 고르게 되고,
+    // 두 걸음을 이어 붙일 수 있다(수련장에서 연마한 초식을 곧장 문파
+    // 방문에서 굳히는 식).
+    if (hasRelic('doubleStep') && !state.secondStepPending) {
+      state.secondStepPending = true;
+      state.crossroad = rollCrossroad();
+      state.node = null;
+      state.nodeView = null;
+      state.phase = 'CROSSROAD';
+      return;
+    }
+    if (state.secondStepPending) {
+      state.secondStepPending = false;
+      state.skipNextCrossroad = true;
+    }
     advanceStage();
   }
 
@@ -593,6 +754,13 @@ const TS_Run = (() => {
   function advanceStage() {
     state.lastHeal = heal(D.STAGE_HEAL_RATIO);
     state.stage += 1;
+    // 이문록 (gdd/15) — 주루가 팔던 정보를 상시화한다
+    if (hasRelic('alwaysIntel')) {
+      for (let i = 0; i < D.TAVERN_INTEL_DEPTH; i++) {
+        const st = state.stage + i;
+        if (st <= D.ENEMIES.length && !state.intel.includes(st)) state.intel.push(st);
+      }
+    }
     state.node = null;
     state.nodeView = null;
     startBattle();
@@ -600,6 +768,7 @@ const TS_Run = (() => {
 
   return {
     get, newRun, chooseDeck, startBattle, syncBattleResult,
+    takeRelic, rollRelicOffer, relicSlotsFree, hasRelic,
     chooseWeapon, takeWeapon, canEquip, handsFree, handsUsed, rollWeaponOffer, weaponOfferView,
     takeCard, skipReward, upgradableIndexes, currentEnemy,
     chooseNode, chooseNodeOption,

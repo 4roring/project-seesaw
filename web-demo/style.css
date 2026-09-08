@@ -462,3 +462,14 @@ button:hover { border-color: var(--text-dim); }
   background: rgba(255, 210, 77, 0.12); border: 1px solid rgba(255, 210, 77, 0.3);
   color: var(--break);
 }
+
+/* 유물 — 무기와 층이 달라 색을 나눈다 (gdd/15-relics.md) */
+.relic-chip {
+  font-size: 10px; padding: 2px 8px; border-radius: 999px; cursor: help;
+  background: rgba(77, 155, 230, 0.12); border: 1px solid rgba(77, 155, 230, 0.35);
+  color: var(--gauge-e-safe);
+}
+.relic-chip.spent { opacity: 0.45; text-decoration: line-through; }
+
+.crossroad-card.node-tomb { border-color: rgba(77, 155, 230, 0.3); }
+.crossroad-card.node-tomb .cr-detail { color: var(--gauge-e-safe); }

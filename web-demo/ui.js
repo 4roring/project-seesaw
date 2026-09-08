@@ -428,6 +428,8 @@ const TS_UI = (() => {
     });
   }
 
+  // 쥔 병기와 지닌 유물. 둘 다 규칙을 비트는 물건이라 전투 중에 보여야
+  // 하지만, 층이 다르므로(무기=한 합, 유물=강호행) 색을 나눈다.
   function renderWeaponStrip(run) {
     const strip = els['weapon-strip'];
     strip.innerHTML = '';
@@ -438,6 +440,17 @@ const TS_UI = (() => {
       span.className = 'weapon-chip';
       span.title = w.rule;
       span.textContent = `${w.icon} ${w.name}`;
+      strip.appendChild(span);
+    });
+    (run.relics || []).forEach((k) => {
+      const rl = D.RELICS[k];
+      if (!rl) return;
+      const span = document.createElement('span');
+      span.className = 'relic-chip';
+      span.title = rl.rule;
+      const used = rl.lastStand && run.lastStandLeft <= 0;
+      span.textContent = `${rl.icon} ${rl.name}${used ? ' (깨짐)' : ''}`;
+      if (used) span.classList.add('spent');
       strip.appendChild(span);
     });
   }
@@ -531,6 +544,10 @@ const TS_UI = (() => {
     if (key === 'FORTUNE') {
       const left = D.FORTUNE_MAX_PER_RUN - run.fortuneUsed;
       return `대가 없는 기연은 없습니다 · 이번 강호행에 ${left}번 남음`;
+    }
+    if (key === 'TOMB') {
+      const free = TS_Run.relicSlotsFree();
+      return `유물 하나 · ${free > 0 ? `자리 ${free}칸 남음` : '자리가 차서 하나를 버려야 합니다'}`;
     }
     return '';
   }

@@ -61,6 +61,11 @@ const TS_Engine = (() => {
 
       // 신병이기 (gdd/14) — 규칙을 비트는 둘째 축. 손은 둘뿐이다.
       weapons: (config.weapons || []).map((w) => (typeof w === 'string' ? D.WEAPONS[w] : w)).filter(Boolean),
+      // 유물 (gdd/15) — 대부분 런 층에서 작동하지만, 쓰러지는 순간과
+      // 파훼처럼 전투 안에서만 관측되는 것은 엔진이 알아야 한다.
+      relics: (config.relics || []).map((r) => (typeof r === 'string' ? D.RELICS[r] : r)).filter(Boolean),
+      lastStandLeft: 0,  // 호심경 — 아래에서 채운다
+      breakCount: 0,     // 오도비 — 런이 전투 후에 읽어 간다
       returnBonusNextTurn: 0, // 곤(棍) — 방어도를 남기면 다음 합이 깊어진다
       // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
       // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
@@ -107,6 +112,9 @@ const TS_Engine = (() => {
       log: [],
       fx: [], // UI 연출 큐 (엔진은 쌓기만, UI가 소비)
     };
+    game.lastStandLeft = config.lastStandLeft != null
+      ? config.lastStandLeft
+      : game.relics.reduce((n, r) => n + (r.lastStand || 0), 0);
     drawCards(game, D.HAND_SIZE);
     pushLog(game, `전투 시작 — ${enemy.name} (HP ${enemy.hp})`);
     return game;
@@ -229,6 +237,14 @@ const TS_Engine = (() => {
       return true;
     }
     if (game.playerHp <= 0) {
+      // 호심경 (gdd/15) — 강호행에 한 번, 쓰러지는 대신 체력 1로 버틴다
+      if (game.lastStandLeft > 0) {
+        game.lastStandLeft -= 1;
+        game.playerHp = 1;
+        pushLog(game, '[호심경] 깨어지며 목숨을 건집니다 — 체력 1로 버팁니다.');
+        pushFx(game, 'heal', { amount: 1 });
+        return false;
+      }
       game.playerHp = 0; game.status = 'LOST';
       pushLog(game, '플레이어 체력이 0이 되었습니다. 패배...');
       return true;
@@ -442,6 +458,7 @@ const TS_Engine = (() => {
 
     if (game.momentumSpentThisTurn >= effectiveBreakThreshold(game)) {
       pushFx(game, 'break', {});
+      game.breakCount += 1;
       if (D.BREAK_GRANTS_VULNERABLE) game.bossVulnerableActive = true;
 
       if (D.BREAK_BUDGET_RATIO != null) {

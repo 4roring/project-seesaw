@@ -49,8 +49,10 @@
 졸업했습니다. 백의 이진성도 함께 풀렸습니다
 ([gdd/3-5](../gdd/03-color-archetypes.md)).
 
-남은 무기 항목(이기어검 · 심검)은 [001 유물](001-artifact-system.md)이
-있어야 대가를 물릴 자리가 생기므로 그쪽이 먼저입니다.
+[001 유물](001-artifact-system.md)도 [gdd/15](../gdd/15-relics.md)로
+졸업했습니다. **심검(011 11-3)은 이제 대가를 물릴 자리가 생겼으므로**
+다음 후보입니다 — 유물 자리 하나를 쓰는 교환이면 맨손 빌드가 정답이
+되지 않습니다.
 
 위 색인의 나머지 보류 항목은 **4색과 10스테이지가 재미있다는 게 확인된
 뒤에** 다시 꺼냅니다 — 특히
@@ -74,4 +76,4 @@
 | [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 슬롯 2칸 · 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **이기어검 · 심검은 보류** |
 | [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
 | [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
-| [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |
+| [001-artifact-system.md](001-artifact-system.md) | ✅ 채택 | 유물 → [gdd/15](../gdd/15-relics.md). **판정선 이동 계열은 검증 후 접음** |
