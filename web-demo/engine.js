@@ -58,6 +58,10 @@ const TS_Engine = (() => {
       enemyRealm: enemy.realm || '',
       // 손패 뚜껑은 문파마다 다르다 (gdd/07 7-2)
       handRefillCap: config.handCap != null ? config.handCap : D.HAND_REFILL_CAP,
+
+      // 신병이기 (gdd/14) — 규칙을 비트는 둘째 축. 손은 둘뿐이다.
+      weapons: (config.weapons || []).map((w) => (typeof w === 'string' ? D.WEAPONS[w] : w)).filter(Boolean),
+      returnBonusNextTurn: 0, // 곤(棍) — 방어도를 남기면 다음 합이 깊어진다
       // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
       // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
       minMomentumReturn: config.minReturn != null ? config.minReturn : D.MIN_MOMENTUM_RETURN,
@@ -200,6 +204,12 @@ const TS_Engine = (() => {
     return healed;
   }
 
+  // 무기 효과는 합산한다 — 한손 둘을 쥐면 두 효과를 동시에 받는다 (gdd/14 14-2).
+  function weaponSum(game, field) {
+    return game.weapons.reduce((sum, w) => sum + (w[field] || 0), 0);
+  }
+  function hasWeapon(game, field) { return game.weapons.some((w) => w[field]); }
+
   // 이번 합에 실제로 넘어야 하는 빈틈. 하한을 두는 이유는 gdd/02 2-3.
   function effectiveBreakThreshold(game) {
     const floor = Math.max(5, game.baseBreakThreshold - 4);
@@ -318,7 +328,9 @@ const TS_Engine = (() => {
 
   // 최소 반환 보장(아3) + 범위 하한 (gdd/08 8-4-4)
   function clampReturnedGauge(game, finalGauge) {
-    return Math.max(Math.min(finalGauge, -game.minMomentumReturn), D.GAUGE_MIN);
+    // 곤(棍)은 방어도를 남긴 합의 다음 합을 한 칸 더 깊게 만든다 (gdd/14).
+    const floor = game.minMomentumReturn + game.returnBonusNextTurn;
+    return Math.max(Math.min(finalGauge, -floor), D.GAUGE_MIN);
   }
 
   function tickBossCooldowns(game) {
@@ -465,6 +477,23 @@ const TS_Engine = (() => {
   }
 
   function endPlayerTurnAndResolveBoss(game, n) {
+    // 검(劍) — 선을 적1로 정확히 넘겼을 때만. 시소의 "작게 넘길수록 크게
+    // 돌아온다"를 극단까지 민 조건이라, 어느 색도 이 축을 쓰지 않는다.
+    const precise = weaponSum(game, 'preciseLanding');
+    if (precise && n === 1) {
+      pushLog(game, `검(劍) — 적1로 정확히 마감. 추가 피해 ${precise}.`);
+      applyDamageToBoss(game, precise);
+      pushFx(game, 'playerAttack', { amount: precise, label: '검(劍)' });
+      if (checkWinLose(game)) return;
+    }
+    // 곤(棍) — 방어도를 남긴 채 넘기면 다음 합이 한 칸 깊어진다.
+    // 적 페이즈가 방어도를 깎기 전의 값으로 판정한다.
+    const guard = weaponSum(game, 'guardReturn');
+    game.returnBonusNextTurn = (guard && game.playerBlock > 0) ? guard : 0;
+    if (game.returnBonusNextTurn > 0) {
+      pushLog(game, `곤(棍) — 방어도 ${game.playerBlock}을 남겨 다음 합이 깊어집니다.`);
+    }
+
     resolveBossPhase(game, n);
     if (checkWinLose(game)) return;
     game.turn += 1;
@@ -486,6 +515,7 @@ const TS_Engine = (() => {
     const effectiveCost = Math.max(0, card.cost - game.pendingCostReduction);
     game.pendingCostReduction = 0;
     game.momentumSpentThisTurn += effectiveCost;
+
 
     game.hand.splice(idx, 1);
     // 소멸(exhaust) 카드는 버린 더미로 가지 않는다 — 메모리를 순증시키는
@@ -534,6 +564,38 @@ const TS_Engine = (() => {
       effectiveDamage += bonus;
       if (bonus > 0) pushLog(game, `광기 — 잃은 체력만큼 추가 피해 ${bonus}.`);
     }
+    // ── 신병이기 (gdd/14) ────────────────────────────────────
+    // 도(刀) — 첫 초식은 크게, 이후는 무디게. 적(赤)의 연계와 정확히
+    // 반대 방향이라 같은 합에서 정반대 순서를 요구한다.
+    if (card.damage > 0) {
+      const first = weaponSum(game, 'firstStrike');
+      const after = weaponSum(game, 'afterFirstPenalty');
+      if (first && game.cardsPlayedThisTurn === 0) {
+        effectiveDamage += first;
+        pushLog(game, `도(刀) — 첫 초식, 추가 피해 ${first}.`);
+      } else if (after && game.cardsPlayedThisTurn > 0) {
+        effectiveDamage -= after;
+      }
+      // 창(槍) — 같은 초식을 거듭 찌를수록 매워진다
+      // 창(槍) — 무거운 초식일수록 매섭다. 적(赤)의 일격이 "버퍼가 깊을 때"
+      // 라면 이쪽은 "무거운 초식을 낼 때"라, 얕은 버퍼에서도 성립한다.
+      const heavyMin = game.weapons.reduce((m, w) => (w.heavyCost ? Math.min(m, w.heavyCost) : m), 99);
+      const heavyBonus = weaponSum(game, 'heavyBonus');
+      if (heavyBonus && card.cost >= heavyMin) {
+        effectiveDamage += heavyBonus;
+        pushLog(game, `창(槍) — 틈 ${card.cost}의 무거운 초식, 추가 피해 ${heavyBonus}.`);
+      }
+      // 암기(暗器) — 합이 길어질수록. 흑의 되감기가 "한 합"을 늘린다면
+      // 이쪽은 "전투"를 늘린다 — 단위가 달라 겹치지 않는다.
+      const att = weaponSum(game, 'attrition');
+      if (att) {
+        const cap = weaponSum(game, 'attritionCap');
+        const bonus = Math.min(cap, att * Math.floor((game.turn - 1) / 2));
+        if (bonus > 0) { effectiveDamage += bonus; }
+      }
+      if (effectiveDamage < 0) effectiveDamage = 0;
+    }
+
     // 방어도 환산 (백) — 카드 자신의 방어도는 아래에서 붙으므로 포함되지 않는다.
     if (card.blockToDamage) {
       const bonus = game.playerBlock * card.blockToDamage;

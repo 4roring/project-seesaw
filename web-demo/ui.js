@@ -16,6 +16,7 @@ const TS_UI = (() => {
       'surge-meter',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
+      'screen-weapon', 'weapon-sub', 'weapon-grid', 'skip-weapon-btn', 'weapon-strip',
       'screen-crossroad', 'crossroad-sub', 'crossroad-grid',
       'screen-node', 'node-title', 'node-sub', 'node-body', 'node-echo',
       'result-title', 'result-sub', 'result-restart-btn',
@@ -24,7 +25,7 @@ const TS_UI = (() => {
 
   // ── 화면 전환 ───────────────────────────────────────────────
   function showScreen(name) {
-    ['select', 'battle', 'reward', 'crossroad', 'node', 'result'].forEach((s) => {
+    ['select', 'weapon', 'battle', 'reward', 'crossroad', 'node', 'result'].forEach((s) => {
       els[`screen-${s}`].classList.toggle('hidden', s !== name);
     });
   }
@@ -32,6 +33,7 @@ const TS_UI = (() => {
   function render() {
     const run = TS_Run.get();
     if (run.phase === 'SELECT') { showScreen('select'); renderDeckSelect(); return; }
+    if (run.phase === 'WEAPON') { showScreen('weapon'); renderWeaponSelect(run); return; }
     if (run.phase === 'BATTLE') { showScreen('battle'); renderBattle(run); return; }
     if (run.phase === 'REWARD') { showScreen('reward'); renderReward(run); return; }
     if (run.phase === 'CROSSROAD') { showScreen('crossroad'); renderCrossroad(run); return; }
@@ -196,6 +198,7 @@ const TS_UI = (() => {
     g.activeEffects.filter((e) => e.kind === 'BOSS_VULNERABLE_AURA')
       .forEach((e) => addBadge(els['boss-badges'], 'vulnerable', `${e.name} +${e.amount}% (${e.turnsRemaining}합)`, true));
 
+    renderWeaponStrip(run);
     els['player-badges'].innerHTML = '';
     addBadge(els['player-badges'], 'block', `방어도 ${g.playerBlock}`, g.playerBlock > 0);
     addBadge(els['player-badges'], 'weaken', '내상(-25%)', g.playerWeakenActive);
@@ -403,6 +406,42 @@ const TS_UI = (() => {
     setTimeout(() => div.remove(), 800);
   }
 
+  // ── 신병이기 (gdd/14) ───────────────────────────────────────
+  // 무기는 수치가 아니라 규칙을 비튼다. 그래서 카드처럼 "피해 N"을 보여줄
+  // 게 없고, 규칙 문장 자체가 곧 카드 설명이다.
+  function renderWeaponSelect(run) {
+    const color = D.COLORS[run.color] || {};
+    els['weapon-sub'].textContent =
+      `${color.sect} · ${color.name} — 손은 둘뿐입니다. 한손 둘을 쥐거나, 양손 하나를 쥡니다.`;
+    els['weapon-grid'].innerHTML = '';
+    Object.values(D.WEAPONS).forEach((w) => {
+      const div = document.createElement('div');
+      div.className = 'weapon-card';
+      div.innerHTML = `
+        <div class="wc-icon">${w.icon}</div>
+        <div class="wc-name">${w.name}</div>
+        <div class="wc-hands">${w.hands === 1 ? '한손 · 손 하나가 남습니다' : '양손 · 손이 다 찹니다'}</div>
+        <div class="wc-rule">${w.rule}</div>
+        <div class="wc-flavor">${w.flavor}</div>`;
+      div.addEventListener('click', () => { TS_Run.chooseWeapon(w.key); render(); });
+      els['weapon-grid'].appendChild(div);
+    });
+  }
+
+  function renderWeaponStrip(run) {
+    const strip = els['weapon-strip'];
+    strip.innerHTML = '';
+    (run.weapons || []).forEach((k) => {
+      const w = D.WEAPONS[k];
+      if (!w) return;
+      const span = document.createElement('span');
+      span.className = 'weapon-chip';
+      span.title = w.rule;
+      span.textContent = `${w.icon} ${w.name}`;
+      strip.appendChild(span);
+    });
+  }
+
   // ── 비무 전리품 ─────────────────────────────────────────────
   // 강화는 여기 없다 — 수련장 걸음으로 옮겼다 (gdd/13 13-3). 전리품과
   // 수련은 성격이 다른 보상인데 한 화면에서 다투게 두면, 둘 중 하나는
@@ -594,6 +633,7 @@ const TS_UI = (() => {
     });
 
     els['skip-reward-btn'].addEventListener('click', () => { TS_Run.skipReward(); resetBattleFx(); render(); });
+    els['skip-weapon-btn'].addEventListener('click', () => { TS_Run.chooseWeapon(null); render(); });
 
     const restart = () => { TS_Run.newRun(); fxCursor = 0; render(); };
     els['restart-btn'].addEventListener('click', restart);

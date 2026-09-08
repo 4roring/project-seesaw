@@ -44,11 +44,13 @@
 
 ## 지금 무엇을 하고 있나 (2026-09-07)
 
-4색과 10스테이지의 재미가 확인되어, [012 갈림길](012-node-map.md)이
-[gdd/13](../gdd/13-crossroads.md)으로 졸업했습니다. 다음 후보는
-[011 무기](011-weapons-slots.md)입니다 — 걸음 하나가 밸런스를 크게 흔든
-직후라, 백의 이진성([gdd/13-5](../gdd/13-crossroads.md))을 먼저 손보는 편이
-낫습니다.
+[012 갈림길](012-node-map.md) → [gdd/13](../gdd/13-crossroads.md),
+[011 무기](011-weapons-slots.md) → [gdd/14](../gdd/14-weapons.md)로
+졸업했습니다. 백의 이진성도 함께 풀렸습니다
+([gdd/3-5](../gdd/03-color-archetypes.md)).
+
+남은 무기 항목(이기어검 · 심검)은 [001 유물](001-artifact-system.md)이
+있어야 대가를 물릴 자리가 생기므로 그쪽이 먼저입니다.
 
 위 색인의 나머지 보류 항목은 **4색과 10스테이지가 재미있다는 게 확인된
 뒤에** 다시 꺼냅니다 — 특히
@@ -69,7 +71,7 @@
 | [008-ascension-goal.md](008-ascension-goal.md) | ⏸ 보류 | 런의 목표 = 등선(登仙). 클리어할수록 높아지는 난이도 사다리. 004와 한 쌍 |
 | [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **기록 재료는 [gdd/13-6](../gdd/13-crossroads.md)이 이미 쌓고 있음** |
 | [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리 |
-| [011-weapons-slots.md](011-weapons-slots.md) | ⏸ 보류 | 무기 = 색과 곱해지는 둘째 축. **보상 슬롯 경쟁은 [gdd/13-7](../gdd/13-crossroads.md)이 풀었음** — 다음 후보 |
+| [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 슬롯 2칸 · 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **이기어검 · 심검은 보류** |
 | [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
 | [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
 | [001-artifact-system.md](001-artifact-system.md) | ⏸ 보류 | 유물. [gdd/09 9-6](../gdd/09-run-structure.md)의 스코프 밖 목록과 동일 |

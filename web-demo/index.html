@@ -16,6 +16,16 @@
       <div class="deck-grid" id="deck-grid"></div>
     </section>
 
+    <!-- ── 신병이기 선택 ────────────────────────────────────── -->
+    <section class="screen hidden" id="screen-weapon">
+      <h2 class="title">신병이기(神兵利器)</h2>
+      <p class="subtitle" id="weapon-sub"></p>
+      <div class="weapon-grid" id="weapon-grid"></div>
+      <div class="reward-actions">
+        <button id="skip-weapon-btn" class="ghost-btn">맨손으로 나선다</button>
+      </div>
+    </section>
+
     <!-- ── 전투 ─────────────────────────────────────────────── -->
     <section class="screen hidden" id="screen-battle">
       <header class="battle-header">
@@ -40,6 +50,7 @@
             <div class="bar-track"><div class="bar-fill hp player" id="player-hp-fill"></div></div>
             <div class="bar-text" id="player-hp-text">70 / 70</div>
           </div>
+          <div class="weapon-strip" id="weapon-strip"></div>
           <div class="badges" id="player-badges"></div>
         </div>
 

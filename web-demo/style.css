@@ -437,3 +437,28 @@ button:hover { border-color: var(--text-dim); }
   background: rgba(77, 230, 138, 0.10);
 }
 .node-echo.hidden { display: none; }
+
+/* ── 신병이기 (gdd/14-weapons.md) ──────────────────────────── */
+.weapon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.weapon-card {
+  display: flex; flex-direction: column; gap: 6px; text-align: center;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+  padding: 16px 14px; cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.weapon-card:hover { transform: translateY(-4px); border-color: var(--break); }
+.weapon-card .wc-icon { font-size: 28px; line-height: 1; }
+.weapon-card .wc-name { font-weight: 700; font-size: 15px; }
+.weapon-card .wc-hands { font-size: 11px; color: var(--text-dim); }
+.weapon-card .wc-rule {
+  font-size: 12px; line-height: 1.5; color: var(--break);
+  border-top: 1px dashed var(--panel-border); padding-top: 8px; margin-top: 2px;
+}
+.weapon-card .wc-flavor { font-size: 11px; color: var(--text-dim); font-style: italic; }
+
+.weapon-strip { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.weapon-chip {
+  font-size: 10px; padding: 2px 8px; border-radius: 999px; cursor: help;
+  background: rgba(255, 210, 77, 0.12); border: 1px solid rgba(255, 210, 77, 0.3);
+  color: var(--break);
+}

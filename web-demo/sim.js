@@ -300,6 +300,11 @@ window.TS_Sim = (() => {
     }
 
     if (st.node.key === 'FORTUNE') {
+      // 무기 제안 — 빈손이면 쥐고, 손이 차 있으면 바꾸지 않는다.
+      // (무기끼리의 우열은 아직 데이터가 없어 AI가 판단할 근거가 없다)
+      const take = live.find((o) => o.id.startsWith('wtake:'));
+      if (take) return take.id;
+      if (live.some((o) => o.id.startsWith('wswap:'))) return 'wleave';
       const forget = live.filter((o) => o.id.startsWith('forget:'));
       if (forget.length) {
         // 덜어낼 것은 가장 값 없는 초식
@@ -308,13 +313,19 @@ window.TS_Sim = (() => {
       }
       // 최대 체력을 깎는 마공은 여유가 있을 때만
       if (st.node.fortune === 'demonic' && hp < 0.6) return 'refuse';
-      return 'accept';
+      // 화면에 없는 선택지를 고르면 chooseNodeOption이 조용히 아무것도
+      // 안 해서 런이 제자리를 돈다 — 반드시 실제 선택지 중에서 고른다.
+      const accept = live.find((o) => o.id === 'accept');
+      return accept ? accept.id : live[0].id;
     }
     return live[0].id;
   }
 
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
+    // 무기를 고정해 한 자루씩 재기 위한 손잡이. null이면 맨손,
+    // 'random'이면 무작위. 색 × 무기 20조합을 하나씩 가르려면 필요하다.
+    const weapon = opts && opts.weapon;
     const casual = !!(opts && opts.casual);
     const search = !!(opts && opts.search);
     const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
@@ -322,6 +333,14 @@ window.TS_Sim = (() => {
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
       R.newRun(); R.chooseDeck(color);
+      if (R.get().phase === 'WEAPON') {
+        let pick = null;
+        if (weapon === 'random') {
+          const keys = Object.keys(TS_DATA.WEAPONS);
+          pick = keys[Math.floor(Math.random() * keys.length)];
+        } else if (weapon) pick = weapon;
+        R.chooseWeapon(pick);
+      }
       let guard = 0, lastNodeId = null, nodeRepeat = 0;
       while (guard++ < 4000) {
         const st = R.get();
@@ -364,6 +383,7 @@ window.TS_Sim = (() => {
     return {
       color,
       policy: search ? '탐색' : casual ? '초심자' : planned ? '계획' : '탐욕',
+      weapon: weapon || '맨손',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
       cardsPerTurn: (stat.plays / stat.turns).toFixed(2),
