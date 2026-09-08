@@ -1,0 +1,37 @@
+# web-demo/ 를 GitHub Pages로 배포한다.
+#
+# 리포 루트에는 gdd/ 와 ideanote/ 같은 문서가 함께 있으므로, 사이트 루트로
+# 올리는 것은 web-demo/ 하나뿐이다. 그래서 배포된 주소에서 index.html이
+# 곧장 열린다. web-demo 안의 경로는 전부 상대 경로(style.css · data.js …)라
+# 어떤 하위 경로에 붙어도 그대로 동작한다.
+name: Deploy web-demo to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포가 겹치면 나중 것만 살린다. 진행 중인 배포를 죽이지는 않는다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web-demo
+      - id: deployment
+        uses: actions/deploy-pages@v4
