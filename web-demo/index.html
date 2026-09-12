@@ -145,9 +145,16 @@
       <div class="rules-box">
         <h3 class="rules-title">규칙은 두 개뿐입니다</h3>
         <div class="rules-body" id="rules-body"></div>
+        <details class="rules-fold" id="rules-term-fold">
+          <summary class="rules-fold-sum">용어 한 눈에</summary>
+          <dl class="rules-terms" id="rules-terms"></dl>
+        </details>
         <button class="primary-btn" id="rules-close">알겠습니다</button>
       </div>
     </div>
+
+    <!-- 용어 풀이 말풍선. 화면들 밖에 둬야 어느 화면에서도 뜬다. -->
+    <div class="term-pop hidden" id="term-pop"></div>
 
   </div>
 

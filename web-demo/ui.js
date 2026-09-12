@@ -15,7 +15,8 @@ const TS_UI = (() => {
       'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'gauge-caption',
       'intent-preview', 'boss-skill-legend',
       'surge-meter',
-      'rules-btn', 'rules-overlay', 'rules-body', 'rules-close',
+      'rules-btn', 'rules-overlay', 'rules-body', 'rules-close', 'rules-terms',
+      'term-pop',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'log-fold', 'log-last',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
@@ -237,6 +238,11 @@ const TS_UI = (() => {
     renderSkillLegend(g);
     renderCombo(g);
     renderHand(run);
+
+    // 용어 점선은 "정보만 담은 칸"에만 긋는다. 손패나 선택지에 넣으면
+    // 용어를 누르는 순간 초식이 나가거나 갈림길이 정해진다.
+    ['gauge-caption', 'intent-preview', 'surge-meter', 'boss-skill-legend',
+      'player-badges', 'boss-badges'].forEach((id) => decorateTerms(els[id]));
 
     els['pile-counts'].textContent =
       `뽑을 더미 ${g.drawPile.length} · 버린 더미 ${g.discardPile.length} · 덱 ${run.deck.length}장`;
@@ -553,6 +559,7 @@ const TS_UI = (() => {
     els['reward-heading'].textContent = run.rewardPicksLeft > 1
       ? `전리품 — 초식 ${run.rewardPicksLeft}장을 거둡니다`
       : '전리품 — 초식 하나를 거둡니다';
+    decorateTerms(els['reward-sub']);
 
     els['reward-grid'].innerHTML = '';
     run.rewardOptions.forEach((opt) => {
@@ -572,6 +579,7 @@ const TS_UI = (() => {
     els['crossroad-sub'].textContent =
       `체력 ${run.playerHp}/${run.playerMaxHp} · 덱 ${run.deck.length}장 · `
       + `다음 상대는 ${D.ENEMIES[run.stage].name}. 어느 걸음을 디딜 것인가.`;
+    decorateTerms(els['crossroad-sub']);
 
     // 주루에서 들은 소문 — 앞 상대의 빈틈과 성격. 이 게임에서 가장 값진
     // 정보라, 걸음을 고르기 전에 보이지 않으면 팔 물건이 못 된다.
@@ -640,6 +648,7 @@ const TS_UI = (() => {
     const view = run.nodeView || { title: '', sub: '', options: [] };
     els['node-title'].textContent = view.title;
     els['node-sub'].textContent = view.sub;
+    decorateTerms(els['node-sub']);
     els['node-body'].innerHTML = '';
 
     const groups = view.groups
@@ -723,8 +732,86 @@ const TS_UI = (() => {
     }).join('');
   }
 
+  function buildRuleTerms() {
+    els['rules-terms'].innerHTML = D.GLOSSARY
+      .map((t) => `<div class="rules-term"><dt>${t.term}</dt><dd>${t.desc}</dd></div>`)
+      .join('');
+  }
+
   function toggleRules(open) {
     els['rules-overlay'].classList.toggle('hidden', !open);
+    if (open) hideTermPop();
+  }
+
+  // ── 용어 풀이 ───────────────────────────────────────────────
+  // 설명문 안의 용어에 점선을 긋고, 누르면 뜻이 뜬다.
+  //
+  // 자동으로 찾되 범위를 좁게 잡는다. 카드나 선택지처럼 "누르면 무슨 일이
+  // 일어나는" 요소 안에는 절대 넣지 않는다 — 용어를 누르면 초식이 나가거나
+  // 갈림길이 정해져 버린다. 그래서 대상은 정보만 담은 칸으로 한정한다.
+  const TERM_DESC = new Map(D.GLOSSARY.map((t) => [t.term, t.desc]));
+  // 한 글자 용어(틈·합)는 자동 표시에서 뺀다. "합니다"의 합, "빈틈"의 틈을
+  // 걸러낼 안전한 규칙이 없다 — 그 둘은 규칙 창의 용어 목록에만 둔다.
+  const AUTO_TERMS = D.GLOSSARY.map((t) => t.term).filter((t) => t.length >= 2);
+
+  // 한 칸에서 같은 용어를 여러 번 긋지 않는다. 점선이 도배되면 읽기가
+  // 오히려 나빠진다 — 누를 곳이 한 군데 있으면 충분하다.
+  function decorateTerms(root) {
+    if (!root) return;
+    const seen = new Set();
+    const nodes = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach((node) => {
+      if (!node.parentElement || node.parentElement.closest('.term')) return;
+      let cur = node;
+      for (;;) {
+        const text = cur.nodeValue;
+        let best = null;
+        AUTO_TERMS.forEach((term) => {
+          if (seen.has(term)) return;
+          const i = text.indexOf(term);
+          if (i === -1) return;
+          // 앞에서 나온 것 우선, 같은 자리면 긴 용어 우선(빈틈 > 기세 같은 겹침)
+          if (!best || i < best.i || (i === best.i && term.length > best.term.length)) {
+            best = { term, i };
+          }
+        });
+        if (!best) return;
+        seen.add(best.term);
+        const tail = cur.splitText(best.i);
+        tail.nodeValue = tail.nodeValue.slice(best.term.length);
+        const span = document.createElement('span');
+        span.className = 'term';
+        span.dataset.term = best.term;
+        span.textContent = best.term;
+        tail.parentNode.insertBefore(span, tail);
+        cur = tail; // 남은 뒤쪽에서 계속 찾는다
+      }
+    });
+  }
+
+  function hideTermPop() {
+    els['term-pop'].classList.add('hidden');
+  }
+
+  function showTermPop(span) {
+    const desc = TERM_DESC.get(span.dataset.term);
+    if (!desc) return;
+    const pop = els['term-pop'];
+    pop.innerHTML = `<b>${span.dataset.term}</b><span>${desc}</span>`;
+    pop.classList.remove('hidden');
+    // 먼저 보여야 크기를 알 수 있다. 화면 밖으로 나가면 안쪽으로 당긴다.
+    const r = span.getBoundingClientRect();
+    const pr = pop.getBoundingClientRect();
+    const margin = 8;
+    let left = r.left + r.width / 2 - pr.width / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - pr.width - margin));
+    let top = r.bottom + 6;
+    if (top + pr.height > window.innerHeight - margin) top = r.top - pr.height - 6;
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(Math.max(margin, top))}px`;
   }
 
   function wireStaticEvents() {
@@ -733,12 +820,37 @@ const TS_UI = (() => {
       toggleRules(true);
     });
     els['rules-close'].addEventListener('click', () => toggleRules(false));
+
+    // 용어 누르기. 문서 전체에 한 번만 걸어 둔다 — 매 렌더마다 점선을
+    // 다시 만들기 때문에, 개별 span에 걸면 리스너가 계속 늘어난다.
+    document.addEventListener('click', (e) => {
+      const span = e.target.closest && e.target.closest('.term');
+      if (span) {
+        e.stopPropagation(); // 카드 선택 해제 등 화면의 다른 처리까지 가지 않게
+        // stopPropagation은 기본 동작을 막지 못한다. 용어가 <summary> 안에
+        // 들어가는 날이 오면, 뜻을 보려고 누른 것이 접이식을 여닫는다.
+        e.preventDefault();
+        if (els['term-pop'].dataset.for === span.dataset.term
+            && !els['term-pop'].classList.contains('hidden')) {
+          hideTermPop();
+        } else {
+          els['term-pop'].dataset.for = span.dataset.term;
+          showTermPop(span);
+        }
+        return;
+      }
+      hideTermPop();
+    }, true);
+    window.addEventListener('scroll', hideTermPop, true);
+    window.addEventListener('resize', hideTermPop);
     // 바깥을 눌러도 닫힌다 — 창 안(.rules-box)을 누른 건 통과시킨다.
     els['rules-overlay'].addEventListener('click', (e) => {
       if (e.target === els['rules-overlay']) toggleRules(false);
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') toggleRules(false);
+      if (e.key !== 'Escape') return;
+      hideTermPop();
+      toggleRules(false);
     });
 
     els['play-zone'].addEventListener('dragover', (e) => {
@@ -779,6 +891,12 @@ const TS_UI = (() => {
     cacheEls();
     buildGaugeTrack();
     buildRules();
+    buildRuleTerms();
+    // 용어 목록은 창 맨 아래에 있다. 펼치면 화면 밖에서 열려서 "눌렀는데
+    // 아무 일도 없다"로 보인다 — 펼친 자리로 데려온다.
+    els['rules-terms'].parentElement.addEventListener('toggle', (e) => {
+      if (e.target.open) e.target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
     els['log-fold'].open = foldOpen('log');
     rememberFold('log', els['log-fold']);
     wireStaticEvents();

@@ -650,3 +650,52 @@ button:hover { border-color: var(--text-dim); }
    "규칙 ?"이 같은 일을 하고, 화면을 떠나게 만들 이유가 없다. */
 .guide-link { color: var(--gauge-e-safe); text-decoration: none; border-bottom: 1px dotted; }
 .guide-link:hover { color: var(--text); }
+
+/* ── 용어 점선과 말풍선 ──────────────────────────────────────────
+   설명문 안의 용어를 누르면 뜻이 뜬다. 점선은 "누를 수 있다"는 유일한
+   신호라서, 색까지 바꾸면 링크로 읽혀 화면이 떠날 것 같아진다. */
+.term {
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+}
+.term:hover { color: var(--text); }
+
+.term-pop {
+  position: fixed; z-index: 70;
+  display: flex; flex-direction: column; gap: 4px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 9px 11px; border-radius: 8px;
+  background: #0e0e16;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  font-size: 12px; line-height: 1.5;
+}
+.term-pop.hidden { display: none; }
+.term-pop b { color: var(--break); font-size: 12.5px; }
+.term-pop span { color: var(--text-dim); }
+
+/* 규칙 창 안의 용어 목록 — 규칙을 읽으러 온 사람이 용어까지 한 자리에서
+   본다. 기본은 접어 둔다: 규칙 두 개가 먼저 읽혀야 한다. */
+.rules-fold { margin-top: 14px; }
+.rules-fold-sum {
+  cursor: pointer; list-style: none;
+  font-size: 12.5px; color: var(--break);
+  padding: 6px 0;
+}
+.rules-fold-sum::-webkit-details-marker { display: none; }
+.rules-fold-sum::before { content: '▸ '; }
+.rules-fold[open] .rules-fold-sum::before { content: '▾ '; }
+.rules-terms { margin: 4px 0 0; }
+.rules-term {
+  display: flex; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px; line-height: 1.5;
+}
+.rules-term:last-child { border-bottom: none; }
+.rules-term dt { flex: 0 0 84px; margin: 0; font-weight: 600; }
+.rules-term dd { margin: 0; color: var(--text-dim); }
+
+@media (max-width: 480px) {
+  .rules-term { flex-direction: column; gap: 1px; }
+  .rules-term dt { flex-basis: auto; }
+}
