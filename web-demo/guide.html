@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timeline Seesaw — 안내</title>
+  <!-- 게임과 같은 style.css를 쓴다. 예시 화면이 실제 화면과 어긋나지
+       않으려면 스타일도 같은 것을 써야 한다. -->
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* 안내 페이지 전용 — 읽는 페이지라 폭을 좁히고 세로로 흐르게 한다 */
+    body { align-items: flex-start; }
+    #app { max-width: 760px; }
+    .guide { display: flex; flex-direction: column; gap: 26px; }
+
+    .g-hero { text-align: center; display: flex; flex-direction: column; gap: 12px; }
+    .g-hero .title { font-size: 30px; }
+    .g-lead { color: var(--text-dim); font-size: 14px; line-height: 1.7; margin: 0; }
+    .g-lead b { color: var(--text); }
+    .g-cta {
+      align-self: center; text-decoration: none;
+      background: var(--red-dim); border: 1px solid var(--red); color: var(--text);
+      padding: 11px 26px; border-radius: 6px; font-size: 15px;
+    }
+    .g-cta:hover { border-color: var(--text); }
+
+    .g-sec { display: flex; flex-direction: column; gap: 10px; }
+    .g-sec > h2 {
+      margin: 0; font-size: 17px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--panel-border);
+    }
+    .g-sec > h2 small { color: var(--text-dim); font-weight: 400; font-size: 12px; margin-left: 8px; }
+
+    /* 주석 붙인 화면 조각 — 실제 게임 요소를 그대로 놓고 번호를 붙인다 */
+    .g-shot { display: flex; flex-direction: column; gap: 10px; }
+    .g-shot > .g-frame {
+      padding: 14px; border-radius: 10px;
+      background: var(--panel); border: 1px solid var(--panel-border);
+    }
+    .g-notes { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+    .g-notes li { display: flex; gap: 9px; font-size: 12.5px; line-height: 1.55; color: var(--text-dim); }
+    .g-notes li b { color: var(--text); font-weight: 600; }
+    .g-pin {
+      flex: 0 0 auto; width: 19px; height: 19px; margin-top: 1px;
+      border-radius: 50%; background: var(--break); color: var(--bg);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+    }
+
+    /* 한 합의 흐름 */
+    .g-flow { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+    .g-flow li {
+      display: flex; gap: 12px; padding: 11px 0;
+      border-bottom: 1px dashed var(--panel-border);
+      font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+    }
+    .g-flow li:last-child { border-bottom: none; }
+    .g-flow b { color: var(--text); }
+    .g-step {
+      flex: 0 0 auto; width: 58px;
+      font-variant-numeric: tabular-nums; color: var(--gauge-e-safe); font-weight: 600;
+    }
+
+    /* 용어표 */
+    .g-terms { display: grid; grid-template-columns: 1fr; gap: 0; }
+    .g-term {
+      display: flex; gap: 12px; padding: 9px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 12.5px; line-height: 1.5;
+    }
+    .g-term:last-child { border-bottom: none; }
+    .g-term dt { flex: 0 0 96px; margin: 0; font-weight: 600; }
+    .g-term dd { margin: 0; color: var(--text-dim); }
+
+    /* 문파 */
+    .g-sects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .g-sect {
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 12px; border-radius: 10px;
+      background: var(--panel); border: 1px solid var(--panel-border);
+    }
+    .g-sect-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    .g-sect-head .g-icon { font-size: 20px; }
+    .g-sect-desc { font-size: 12px; line-height: 1.55; color: var(--text-dim); }
+
+    .g-foot {
+      display: flex; justify-content: center; gap: 16px;
+      padding-top: 8px; font-size: 12px; color: var(--text-dim);
+    }
+    .g-foot a { color: var(--gauge-e-safe); }
+
+    /* style.css의 480px 규칙이 .surge-hint를 숨긴다. 전투 화면에서는 그게
+       맞지만(높이를 아끼려고 접은 것), 안내 페이지에서는 그 문장이 바로
+       설명이라 숨기면 빈 바만 남는다. */
+    .g-frame .surge-hint { display: inline !important; }
+
+    @media (max-width: 560px) {
+      .g-sects { grid-template-columns: 1fr; }
+      .g-term { flex-direction: column; gap: 2px; }
+      .g-term dt { flex-basis: auto; }
+      .g-step { width: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="guide">
+
+      <header class="g-hero">
+        <h1 class="title">Timeline Seesaw</h1>
+        <p class="g-lead">
+          기세라는 <b>시소 하나</b>를 둘이 밀고 당기는 무림 덱빌딩 로그라이크.<br />
+          외울 것은 <b>규칙 두 개</b>뿐입니다 — 아래 둘만 읽고 시작하셔도 됩니다.
+        </p>
+        <a class="g-cta" href="index.html">바로 해보기 →</a>
+      </header>
+
+      <section class="g-sec" id="sec-rules"></section>
+
+      <section class="g-sec">
+        <h2>화면 읽는 법 <small>실제 화면 조각입니다</small></h2>
+        <div class="g-shot">
+          <div class="g-frame" id="shot-gauge"></div>
+          <ul class="g-notes" id="notes-gauge"></ul>
+        </div>
+        <div class="g-shot">
+          <div class="g-frame" id="shot-surge"></div>
+          <ul class="g-notes" id="notes-surge"></ul>
+        </div>
+        <div class="g-shot">
+          <div class="g-frame" id="shot-card"></div>
+          <ul class="g-notes" id="notes-card"></ul>
+        </div>
+      </section>
+
+      <section class="g-sec">
+        <h2>한 합은 이렇게 흐릅니다</h2>
+        <ol class="g-flow" id="flow"></ol>
+      </section>
+
+      <section class="g-sec">
+        <h2>용어 한 눈에</h2>
+        <dl class="g-terms" id="terms"></dl>
+      </section>
+
+      <section class="g-sec">
+        <h2>문파 넷 <small>고르면 시작 덱이 정해집니다</small></h2>
+        <div class="g-sects" id="sects"></div>
+      </section>
+
+      <footer class="g-foot">
+        <a href="index.html">시작하기</a>
+        <span>·</span>
+        <a href="https://github.com/4roring/project-seesaw">소스</a>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- data.js와 ui.js만 필요하다 (설명 생성·기세 축 렌더). init()은 부르지
+       않는다 — 전투 화면의 DOM이 없으므로. -->
+  <script src="data.js"></script>
+  <script src="ui.js"></script>
+  <script>
+  (() => {
+    const D = TS_DATA;
+    const $ = (id) => document.getElementById(id);
+    // 숫자 뒤 조사. 수치가 바뀌면 "빈틈 6를"처럼 어긋나므로 읽기로 고른다.
+    const JONG = { 0: 1, 1: 1, 2: 0, 3: 1, 4: 0, 5: 0, 6: 1, 7: 1, 8: 1, 9: 0 };
+    const josa = (n, withJong, without) => (JONG[n % 10] ? withJong : without);
+
+    // ── 규칙 두 개 — 전투 화면의 "규칙 ?" 창과 같은 배열을 읽는다
+    const rules = $('sec-rules');
+    rules.innerHTML = '<h2>규칙은 두 개뿐입니다</h2>' + D.RULES.map((sec, i) => {
+      const num = i < 2 ? `<span class="rules-num">${i + 1}</span>` : '';
+      return `<h4 class="rules-sec">${num}${sec.title}</h4>`
+        + sec.lines.map((l) => `<p class="rules-line">${l}</p>`).join('');
+    }).join('');
+
+    // ── 기세 축 — 게임과 같은 빌더로 그린다
+    const gaugeAt = D.STARTING_GAUGE; // 강호행은 여기서 시작한다
+    const track = document.createElement('div');
+    track.className = 'gauge-track';
+    const cells = document.createElement('div');
+    cells.className = 'gauge-cells';
+    TS_UI.buildGaugeCells(cells);
+    const marker = document.createElement('div');
+    marker.className = 'gauge-marker';
+    marker.style.left = TS_UI.gaugePercent(gaugeAt) + '%';
+    track.append(cells, marker);
+    const caption = document.createElement('div');
+    caption.className = 'gauge-caption';
+    caption.textContent = `기세 아${-gaugeAt} — 틈 ${-gaugeAt}까지는 내 합, 0을 넘기면 선이 적에게`;
+    $('shot-gauge').append(track, caption);
+
+    const note = (n, html) => `<li><span class="g-pin">${n}</span><span>${html}</span></li>`;
+    $('notes-gauge').innerHTML =
+      note(1, `<b>삼각형</b>이 지금의 기세입니다. 강호행은 <b>아${-gaugeAt}</b>에서 시작합니다.`)
+      + note(2, '초식을 쓸 때마다 삼각형이 <b>오른쪽으로</b> 그 초식의 틈만큼 밀립니다.')
+      + note(3, `<b>0을 넘어가면</b> 그 합은 끝입니다. 오른쪽 칸의 색(파랑 → 주황 → 빨강)이 곧 <b>적이 얼마나 크게 반격하는지</b>입니다.`)
+      + note(4, `반격이 끝나면 삼각형은 다시 왼쪽으로 돌아옵니다(최소 <b>아${D.MIN_MOMENTUM_RETURN}</b> 보장). `
+        + '<b>깊게 넘겨도 더 깊이 돌아오지는 않습니다</b> — 늘어나는 건 적의 행동 수뿐입니다. '
+        + '그래서 기본은 <b>얕게 넘기는 것</b>이고, 한 합에 크게 몰아치는 힘은 문파의 수단으로 만듭니다.');
+
+    // ── 몰아치기 바 — 첫 상대의 실제 빈틈으로 그린다
+    const first = D.ENEMIES[0];
+    const need = first.breakThreshold;
+    const spent = Math.max(1, need - 2); // "거의 다 찼다"는 그림
+    const meter = document.createElement('div');
+    meter.className = 'surge-meter';
+    meter.innerHTML = '<span class="surge-label">몰아치기</span>'
+      + `<span class="surge-bar"><span class="surge-fill" style="width:${Math.round((spent / need) * 100)}%"></span></span>`
+      + `<span class="surge-num">${spent} / ${need}</span>`
+      + '<span class="surge-hint">한 합에 몰아친 틈이 빈틈에 닿으면 파훼</span>';
+    $('shot-surge').appendChild(meter);
+    $('notes-surge').innerHTML =
+      note(1, `왼쪽 수는 <b>이번 합에 쓴 틈의 합계</b>, 오른쪽은 지금 상대의 <b>빈틈</b>입니다. 첫 상대 ${first.name}의 빈틈은 <b>${need}</b>입니다.`)
+      + note(2, `<b>${need}에 닿은 채로</b> 선을 넘기면 파훼 — 적의 반격이 통째로 사라집니다. ${need - 1}에서 멈추면 아무 일도 없습니다.`)
+      + note(3, '합이 끝나면 0으로 돌아갑니다. <b>여러 합에 걸쳐 모을 수 없습니다.</b>')
+      + note(4, '숨 고르기는 기세를 쓰지만 <b>이 수를 올리지 않습니다</b>. 물러서는 행동으로는 초식을 깨뜨릴 수 없습니다.');
+
+    // ── 초식 카드 — 시작 덱의 실제 카드 한 장
+    const redDeck = D.STARTER_DECKS.RED;
+    const pick = redDeck.find((c) => c.cost >= 2) || redDeck[0];
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card RED';
+    cardEl.innerHTML = `<div class="card-cost">${pick.cost}</div>`
+      + `<div class="card-name">${pick.name}</div>`
+      + `<div class="card-desc">${TS_UI.describe(pick)}</div>`;
+    const cardWrap = document.createElement('div');
+    cardWrap.className = 'hand-row';
+    cardWrap.appendChild(cardEl);
+    $('shot-card').appendChild(cardWrap);
+    $('notes-card').innerHTML =
+      note(1, `왼쪽 위의 동그란 수가 <b>틈</b>입니다. 이 초식은 틈 <b>${pick.cost}</b> — 쓰면 기세가 ${pick.cost}칸 밀립니다.`)
+      + note(2, '아래 글이 효과입니다. 수치는 데이터에서 만들어지므로 <b>강화해도 설명이 어긋나지 않습니다</b>.')
+      + note(3, '넓은 화면에서는 눌러서 바로 냅니다. 좁은 화면에서는 <b>한 번 눌러 고르고, 다시 눌러 냅니다</b> — 손가락으로 잘못 내는 일을 막습니다.');
+
+    // ── 한 합의 흐름. 첫 상대의 실제 수치로 계산한다 — 손으로 쓴 예시는
+    // 수치를 조정하면 조용히 거짓이 된다.
+    //
+    // "깊게 넘기면 깊게 돌아온다"고 먼저 썼다가 실측에서 뒤집혔다. 적의
+    // 예산은 내가 넘긴 깊이라서, 깊게 넘기면 적의 행동만 늘고 돌아오는
+    // 기세는 오히려 같거나 얕다 (적1 → 아4, 적6 → 아3).
+    const room = -D.STARTING_GAUGE;
+    const step = (label, html) => `<li><span class="g-step">${label}</span><span>${html}</span></li>`;
+    $('flow').innerHTML =
+      step('1합', `<b>아${room}</b>에서 시작합니다. 틈 <b>${room}</b>까지는 선을 넘기지 않습니다. `
+        + `${first.name}의 빈틈은 ${need}. <b>이 합에 파훼는 불가능합니다</b> — `
+        + `방어를 세우고 손패를 모으는 합입니다.`)
+      + step('선 넘김', `0을 넘기면 적의 차례입니다. <b>내가 넘긴 깊이가 그대로 적의 예산</b>이라, `
+        + `깊게 넘기면 적이 더 많이 움직입니다. 그런데 돌아오는 기세는 <b>아${D.MIN_MOMENTUM_RETURN} 안팎으로 거의 일정합니다</b> — `
+        + `깊게 넘겨서 얻는 것은 없습니다. 기본은 <b>얕게</b>.`)
+      + step('2합', `그래서 한 합에 쓸 수 있는 틈은 대체로 ${D.MIN_MOMENTUM_RETURN}~${D.MIN_MOMENTUM_RETURN + 1}입니다. `
+        + `빈틈 ${need}${josa(need, '을', '를')} 맨손으로 채울 수는 없습니다 — <b>파훼는 문파의 수단으로 만듭니다</b>. `
+        + `무당의 되감기(기세를 되돌려 합을 늘린다), 금강사의 빈틈 감소(${need}${josa(need, '을', '를')} 끌어내린다), `
+        + `화산의 연환(한 합에 더 많은 초식)이 전부 이 하나를 노립니다.`)
+      + step('파훼', `몰아치기를 ${need}까지 채운 채로 선을 넘기면 <b>파훼</b>. `
+        + `${first.name}의 반격 한 페이즈가 통째로 사라지고, 다음 합에는 사혈이 드러나 피해가 더 들어갑니다.`)
+      + step('되풀이', `"모으고 → 얕게 넘기고 → 어느 합에 몰아친다"가 한 비무의 리듬입니다. `
+        + `<b>매 합 최선을 다하는 게 아니라, 어느 합에 터뜨릴지를 정하는 게임</b>입니다.`);
+
+    // ── 용어표
+    $('terms').innerHTML = D.GLOSSARY
+      .map((t) => `<div class="g-term"><dt>${t.term}</dt><dd>${t.desc}</dd></div>`)
+      .join('');
+
+    // ── 문파 넷
+    $('sects').innerHTML = Object.entries(D.COLORS).map(([key, info]) => {
+      const list = D.STARTER_DECKS[key]
+        .map((c) => `${c.name}${c.count > 1 ? `×${c.count}` : ''}`).join(' · ');
+      return `<div class="g-sect ${key}">
+        <div class="g-sect-head"><span class="g-icon">${info.icon}</span>${info.sect}
+          <span style="color:var(--text-dim);font-weight:400">${info.name}</span></div>
+        <div class="g-sect-desc">${info.desc}</div>
+        <div class="deck-list">${list}</div>
+      </div>`;
+    }).join('');
+  })();
+  </script>
+</body>
+</html>

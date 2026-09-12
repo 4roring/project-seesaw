@@ -147,15 +147,19 @@ const TS_UI = (() => {
   // ── 전투 ────────────────────────────────────────────────────
   // 기세 축은 아6 ~ 적6 고정. 빈틈은 축의 칸이 아니라 "한 합의 총 틈"이라
   // 별도로 표시한다 (gdd/02 2-2).
-  function buildGaugeTrack() {
-    els['gauge-cells'].innerHTML = '';
+  // host를 받는 이유: guide.html이 같은 축을 그린다. 안내 페이지가 축을
+  // 따로 그리면 칸 색과 눈금이 게임과 어긋나도 아무도 모른다.
+  function buildGaugeCells(host) {
+    host.innerHTML = '';
     for (let v = D.GAUGE_MIN; v <= D.GAUGE_MAX; v++) {
       const cell = document.createElement('div');
       cell.className = 'gauge-cell ' + zoneClassFor(v);
       cell.textContent = v === 0 ? '0' : v < 0 ? `아${-v}` : `적${v}`;
-      els['gauge-cells'].appendChild(cell);
+      host.appendChild(cell);
     }
   }
+
+  function buildGaugeTrack() { buildGaugeCells(els['gauge-cells']); }
 
   function zoneClassFor(v) {
     if (v < 0) return 'p';
@@ -782,5 +786,14 @@ const TS_UI = (() => {
     render();
   }
 
-  return { init, render };
+  // describe는 guide.html도 쓴다 — 안내 페이지가 카드 설명을 따로 쓰면
+  // 수치를 바꿀 때 게임과 안내가 서로 다른 말을 하게 된다.
+  return {
+    init, render,
+    // 아래 셋은 guide.html이 쓴다 — 안내 페이지가 카드 설명과 기세 축을
+    // 따로 만들면 수치를 바꿀 때 게임과 다른 말을 하게 된다.
+    describe: TS_Text.describe,
+    buildGaugeCells,
+    gaugePercent,
+  };
 })();

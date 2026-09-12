@@ -618,7 +618,9 @@ button:hover { border-color: var(--text-dim); }
 .rules-overlay.hidden { display: none; }
 .rules-box {
   width: 100%; max-width: 520px;
-  max-height: 88vh; overflow-y: auto;
+  /* 좁은 화면에서 12px이 모자라 안쪽 스크롤이 생겼다. 12px만 잘리면
+     잘린 것이 보이지 않아 "규칙은 이것뿐"이라고 읽힌다. */
+  max-height: 92vh; overflow-y: auto;
   padding: 18px 20px 16px;
   border-radius: 12px;
   background: var(--panel);
@@ -643,3 +645,8 @@ button:hover { border-color: var(--text-dim); }
 }
 .rules-line b { color: var(--text); font-weight: 600; }
 .rules-box .primary-btn { width: 100%; margin-top: 14px; }
+
+/* 안내 페이지로 가는 길. 시작 화면에만 둔다 — 전투 중에는 헤더의
+   "규칙 ?"이 같은 일을 하고, 화면을 떠나게 만들 이유가 없다. */
+.guide-link { color: var(--gauge-e-safe); text-decoration: none; border-bottom: 1px dotted; }
+.guide-link:hover { color: var(--text); }
