@@ -12,8 +12,10 @@ const TS_UI = (() => {
       'deck-grid', 'stage-badge', 'stage-name', 'turn-count', 'restart-btn',
       'player-avatar', 'player-name', 'player-hp-fill', 'player-hp-text', 'player-badges', 'player-fx',
       'enemy-avatar', 'enemy-name', 'boss-hp-fill', 'boss-hp-text', 'boss-badges', 'enemy-fx',
-      'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'intent-preview', 'boss-skill-legend',
+      'arena', 'gauge-cells', 'gauge-marker', 'memory-fx', 'gauge-caption',
+      'intent-preview', 'boss-skill-legend',
       'surge-meter',
+      'rules-btn', 'rules-overlay', 'rules-body', 'rules-close',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'log-fold', 'log-last',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
@@ -221,6 +223,7 @@ const TS_UI = (() => {
       .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 회복+${e.amount} (${e.turnsRemaining}합)`, true));
 
     els['gauge-marker'].style.left = gaugePercent(g.gauge) + '%';
+    renderGaugeCaption(g);
     renderSurge(g);
 
     const intent = TS_Engine.previewIntent(g);
@@ -248,6 +251,22 @@ const TS_UI = (() => {
     playPendingFx(g);
   }
 
+  // 기세 축 아래 한 줄. 규칙("0을 넘기면 선이 넘어간다")과 지금 당장 필요한
+  // 숫자("남은 틈")를 같이 말한다. 남은 틈은 지금까지 화면 어디에도 없어서,
+  // 처음 하는 사람은 카드를 내 보고 나서야 합이 끝난 걸 알았다.
+  function renderGaugeCaption(g) {
+    const el = els['gauge-caption'];
+    if (!el) return;
+    if (g.gauge > 0) {
+      el.textContent = `기세 ${TS_Engine.gaugeLabel(g.gauge)} — 선이 적에게 넘어가 있습니다`;
+      return;
+    }
+    const room = -g.gauge;
+    el.textContent = room > 0
+      ? `기세 ${TS_Engine.gaugeLabel(g.gauge)} — 틈 ${room}까지는 내 합, 0을 넘기면 선이 적에게`
+      : '기세 0 — 여기서 한 칸만 더 밀면 선이 적에게 넘어갑니다';
+  }
+
   // 몰아치기 — 이번 합에 지불한 총 틈. 빈틈에 닿으면 파훼 (gdd/02 2-1)
   function renderSurge(g) {
     const el = els['surge-meter'];
@@ -256,10 +275,15 @@ const TS_UI = (() => {
     const need = TS_Engine.effectiveBreakThreshold(g);
     const pct = Math.min(100, Math.round((spent / need) * 100));
     el.className = 'surge-meter' + (spent >= need ? ' ready' : '');
+    // 힌트를 둘로 나눈다. "규칙 설명"은 좁은 화면에서 숨겨도 되지만,
+    // "지금 파훼가 걸렸다"는 상태는 숨기면 판단 근거가 사라진다 — 예전에는
+    // 둘이 한 칸이어서 모바일에서 통째로 사라졌다.
     el.innerHTML = `<span class="surge-label">몰아치기</span>`
       + `<span class="surge-bar"><span class="surge-fill" style="width:${pct}%"></span></span>`
       + `<span class="surge-num">${spent} / ${need}</span>`
-      + `<span class="surge-hint">${spent >= need ? '이대로 선을 넘기면 파훼!' : '한 합에 몰아친 틈이 빈틈을 넘으면 파훼'}</span>`;
+      + (spent >= need
+        ? '<span class="surge-ready">이대로 선을 넘기면 파훼!</span>'
+        : '<span class="surge-hint">한 합에 몰아친 틈이 빈틈에 닿으면 파훼</span>');
   }
 
   function addBadge(container, cls, text, active) {
@@ -297,7 +321,9 @@ const TS_UI = (() => {
     // 텍스트 " · "를 그냥 두면 좁은 화면에서 점만 있는 빈 줄이 생긴다.
     head.innerHTML = `<span class="boss-style-id"><b>빈틈 ${eff}${eff !== g.breakThreshold ? ` (원래 ${g.breakThreshold})` : ''}</b> · <b>${style.name}</b></span>`
       + `<span class="boss-style-hint">${style.hint}</span>`
-      + `<span class="boss-style-hint">한 합에 틈 ${eff}을 몰아치면 파훼`
+      // 몰아치기 진행은 아래 몰아치기 바와 같은 숫자라, 좁은 화면에서는
+      // 이 줄만 접는다 (CSS에서 .boss-style-surge).
+      + `<span class="boss-style-hint boss-style-surge">한 합에 틈 ${eff}을 몰아치면 파훼`
       + (need > 0 ? ` — 지금 ${g.momentumSpentThisTurn}/${eff}` : ' — <b>완성!</b>')
       + `</span>`;
     els['boss-skill-legend'].appendChild(head);
@@ -681,7 +707,36 @@ const TS_UI = (() => {
   }
 
   // ── 입력 배선 ───────────────────────────────────────────────
+  // ── 규칙 창 ─────────────────────────────────────────────────
+  // 문장은 data.js의 RULES에서 읽는다 — 여기에 직접 쓰면 안내 페이지와
+  // 어긋나고, 상수를 바꿔도 설명이 안 따라온다.
+  function buildRules() {
+    els['rules-body'].innerHTML = D.RULES.map((sec, i) => {
+      const head = D.RULES.length - 1 === i
+        ? `<h4 class="rules-sec">${sec.title}</h4>`
+        : `<h4 class="rules-sec"><span class="rules-num">${i + 1}</span>${sec.title}</h4>`;
+      return head + sec.lines.map((l) => `<p class="rules-line">${l}</p>`).join('');
+    }).join('');
+  }
+
+  function toggleRules(open) {
+    els['rules-overlay'].classList.toggle('hidden', !open);
+  }
+
   function wireStaticEvents() {
+    els['rules-btn'].addEventListener('click', (e) => {
+      e.stopPropagation(); // 전투 화면의 "고른 카드 놓기"까지 타지 않게
+      toggleRules(true);
+    });
+    els['rules-close'].addEventListener('click', () => toggleRules(false));
+    // 바깥을 눌러도 닫힌다 — 창 안(.rules-box)을 누른 건 통과시킨다.
+    els['rules-overlay'].addEventListener('click', (e) => {
+      if (e.target === els['rules-overlay']) toggleRules(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') toggleRules(false);
+    });
+
     els['play-zone'].addEventListener('dragover', (e) => {
       e.preventDefault(); els['play-zone'].classList.add('drag-over');
     });
@@ -719,6 +774,7 @@ const TS_UI = (() => {
   function init() {
     cacheEls();
     buildGaugeTrack();
+    buildRules();
     els['log-fold'].open = foldOpen('log');
     rememberFold('log', els['log-fold']);
     wireStaticEvents();

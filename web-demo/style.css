@@ -323,6 +323,14 @@ button:hover { border-color: var(--text-dim); }
   font-size: 12px;
 }
 .boss-style-hint { opacity: 0.72; font-size: 11px; }
+
+/* 기세 축 아래 한 줄 — 규칙과 "지금 쓸 수 있는 틈"을 같이 말한다 */
+.gauge-caption {
+  margin-top: 6px;
+  font-size: 11.5px; line-height: 1.35;
+  color: var(--text-dim);
+  text-align: center;
+}
 .deck-color { opacity: 0.7; font-weight: 400; }
 
 /* 몰아치기 — 한 합에 지불한 총 틈 / 파훼 임계점 (gdd/02 2-1) */
@@ -347,7 +355,9 @@ button:hover { border-color: var(--text-dim); }
 .surge-num { font-variant-numeric: tabular-nums; opacity: 0.9; }
 .surge-hint { opacity: 0.6; font-size: 11px; }
 .surge-meter.ready { background: rgba(226, 87, 76, 0.18); }
-.surge-meter.ready .surge-hint { opacity: 0.95; color: #ffb3ad; }
+/* 규칙 설명(.surge-hint)과 달리 이건 지금의 상태다 — 어느 폭에서도 숨기지
+   않는다. 파훼가 걸렸는지 모르면 선을 넘길지 말지 정할 수 없다. */
+.surge-ready { font-size: 11px; font-weight: 600; color: #ffb3ad; }
 
 /* 강화 선택 — 설명과 함께 무엇이 어떻게 강해지는지 (text.js가 생성) */
 .upgrade-chip {
@@ -527,8 +537,14 @@ button:hover { border-color: var(--text-dim); }
   .play-zone { display: none; }
 
   /* 힌트 문구는 규칙을 처음 배울 때만 필요하다. 매 합 읽는 정보(연환
-     점, 몰아치기 수치)는 남기고 설명문만 접는다. */
+     점, 몰아치기 수치)는 남기고 설명문만 접는다. 설명은 헤더의 "규칙 ?"
+     창에 그대로 있다 — 예전에는 여기서 숨기고 대신 볼 곳이 없었다.
+     .surge-ready(파훼 걸림)는 설명이 아니라 상태라 여기 없다. */
   .combo-hint, .surge-hint { display: none; }
+  /* 아래 몰아치기 바와 같은 숫자를 두 번 말하던 줄. 이 한 줄을 접어
+     기세 캡션의 높이를 만든다 (한 화면 유지). */
+  .boss-style-surge { display: none; }
+  .gauge-caption { margin-top: 4px; font-size: 11px; }
   .combo-row { gap: 8px; font-size: 11px; }
   .surge-meter { margin: 0; padding: 5px 8px; }
 
@@ -585,3 +601,45 @@ button:hover { border-color: var(--text-dim); }
     font-size: 10px; color: var(--break); text-align: center;
   }
 }
+
+/* ── 규칙 창 ─────────────────────────────────────────────────────
+   헤더의 "규칙 ?"로 연다. 화면 높이를 한 픽셀도 쓰지 않는 게 목적이다 —
+   좁은 화면에서 설명문을 접은 대신, 볼 곳은 항상 한 번의 탭 거리에 있다. */
+.rules-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(10, 10, 16, 0.78);
+  backdrop-filter: blur(2px);
+}
+/* .hidden 단독 규칙은 없고(.screen.hidden만 있다), 있더라도 위의
+   display:flex와 명시도가 같아 뒤에 온 쪽이 이긴다. 실제로 규칙 창이
+   처음부터 열린 채로 떴다. */
+.rules-overlay.hidden { display: none; }
+.rules-box {
+  width: 100%; max-width: 520px;
+  max-height: 88vh; overflow-y: auto;
+  padding: 18px 20px 16px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+}
+.rules-title { margin: 0 0 12px; font-size: 17px; }
+.rules-sec {
+  display: flex; align-items: center; gap: 7px;
+  margin: 16px 0 6px; font-size: 13.5px; color: var(--break);
+}
+.rules-sec:first-child { margin-top: 0; }
+.rules-num {
+  flex: 0 0 auto;
+  width: 19px; height: 19px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--bg); background: var(--break);
+}
+.rules-line {
+  margin: 0 0 5px; padding-left: 2px;
+  font-size: 12.5px; line-height: 1.55; color: var(--text-dim);
+}
+.rules-line b { color: var(--text); font-weight: 600; }
+.rules-box .primary-btn { width: 100%; margin-top: 14px; }

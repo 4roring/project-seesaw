@@ -36,6 +36,7 @@
         </div>
         <div class="header-right">
           <span class="turn-info"><span id="turn-count">1</span>합</span>
+          <button id="rules-btn" class="ghost-btn">규칙 ?</button>
           <button id="restart-btn" class="ghost-btn">런 포기</button>
         </div>
       </header>
@@ -75,6 +76,7 @@
           <div class="gauge-marker" id="gauge-marker"></div>
           <div class="memory-fx" id="memory-fx"></div>
         </div>
+        <div class="gauge-caption" id="gauge-caption"></div>
         <div class="intent-preview" id="intent-preview"></div>
         <div class="boss-skill-legend" id="boss-skill-legend"></div>
       </section>
@@ -135,6 +137,16 @@
       <p class="subtitle" id="result-sub"></p>
       <button id="result-restart-btn" class="primary-btn">새 런 시작</button>
     </section>
+
+    <!-- ── 규칙 창 ──────────────────────────────────────────── -->
+    <!-- 화면들 밖에 둔다 — screen 안에 넣으면 showScreen이 같이 숨긴다. -->
+    <div class="rules-overlay hidden" id="rules-overlay">
+      <div class="rules-box">
+        <h3 class="rules-title">규칙은 두 개뿐입니다</h3>
+        <div class="rules-body" id="rules-body"></div>
+        <button class="primary-btn" id="rules-close">알겠습니다</button>
+      </div>
+    </div>
 
   </div>
 
