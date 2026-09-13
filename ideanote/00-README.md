@@ -76,4 +76,5 @@
 | [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 슬롯 2칸 · 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **이기어검 · 심검은 보류** |
 | [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
 | [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
+| [014-weapon-mastery.md](014-weapon-mastery.md) | ⏸ 보류 | 무기를 계속 쥐면 세 번 자란다 — 기 · 강 · 의. **무기 축을 세 배로 부풀려 지금은 접음** |
 | [001-artifact-system.md](001-artifact-system.md) | ✅ 채택 | 유물 → [gdd/15](../gdd/15-relics.md). **판정선 이동 계열은 검증 후 접음** |
