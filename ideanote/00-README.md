@@ -50,10 +50,9 @@
 ([gdd/3-5](../gdd/03-color-archetypes.md)).
 
 [001 유물](001-artifact-system.md)도 [gdd/15](../gdd/15-relics.md)로
-졸업했습니다. **심검(011 11-3)은 대가를 물릴 자리가 생겼지만 보류입니다**
-(2026-09-13) — 자리가 없어서가 아니라 재는 비용 때문입니다
-([gdd/14-7](../gdd/14-weapons.md)). 심검이 풀려던 **맨손 문제**는 따로
-떼어 [015](015-barehanded.md)에 정리했습니다.
+졸업했습니다. **병기는 한 자루만 쥐게 됐습니다**(2026-09-13) — 한손 둘을
+접고, 맨손은 [015](015-barehanded.md)의 결정대로 **권갑**으로 바꾸고,
+전제를 잃은 **심검은 제거**했습니다([gdd/14-2 · 14-7](../gdd/14-weapons.md)).
 
 위 색인의 나머지 보류 항목은 **4색과 10스테이지가 재미있다는 게 확인된
 뒤에** 다시 꺼냅니다 — 특히
@@ -74,9 +73,10 @@
 | [008-ascension-goal.md](008-ascension-goal.md) | ⏸ 보류 | 런의 목표 = 등선(登仙). 클리어할수록 높아지는 난이도 사다리. 004와 한 쌍 |
 | [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **기록 재료는 [gdd/13-6](../gdd/13-crossroads.md)이 이미 쌓고 있음** |
 | [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리 |
-| [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 슬롯 2칸 · 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **이기어검 · 심검은 보류** |
+| [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **슬롯 2칸은 접음(한 자루) · 심검 제거 · 이기어검 보류** |
 | [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
 | [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
 | [014-weapon-mastery.md](014-weapon-mastery.md) | ⏸ 보류 | 무기를 계속 쥐면 세 번 자란다 — 기 · 강 · 의. **무기 축을 세 배로 부풀려 지금은 접음** |
 | [001-artifact-system.md](001-artifact-system.md) | ✅ 채택 | 유물 → [gdd/15](../gdd/15-relics.md). **판정선 이동 계열은 검증 후 접음** |
-| [015-barehanded.md](015-barehanded.md) | ⏸ 보류 | 맨손(4.35)은 고를 이유가 없는데 시작 화면에 있다. **고치는 길 넷을 늘어놓기만 함 — 제거도 보류** |
+| [015-barehanded.md](015-barehanded.md) | ✅ 결정 | 맨손 삭제 → 여섯째 병기 권갑(방어도 없이 넘기면 다음 합 첫 공격 +3, [gdd/14-3](../gdd/14-weapons.md)) |
+| [016-four-acts.md](016-four-acts.md) | 🌱 씨앗 | 네 막 · 30스테이지(8·8·8·6). 문파 40장(궁극기 6 포함) + 공용 무기 초식 12장. 궁극기는 2막 보스 전리품, 런당 하나 |
