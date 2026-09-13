@@ -111,6 +111,9 @@ const TS_Engine = (() => {
 
       log: [],
       fx: [], // UI 연출 큐 (엔진은 쌓기만, UI가 소비)
+      // 직전 타격에서 "실제로 깎인 체력"과 "방어도가 먹은 양". 연출이
+      // 체력 막대를 따라가는 데 쓴다 (recordHit 주석 참고).
+      lastHit: { hp: 0, absorbed: 0 },
     };
     game.lastStandLeft = config.lastStandLeft != null
       ? config.lastStandLeft
@@ -252,6 +255,14 @@ const TS_Engine = (() => {
     return false;
   }
 
+  // 반환값은 "타격의 크기"다 — 로그와 흡혈이 이 값을 쓴다. 방어도에 막힌
+  // 뒤 실제로 깎인 체력은 game.lastHit에 남긴다. 연출이 체력 막대를
+  // 따라가려면 그 값이 필요한데, 둘은 방어도만큼 다르다 (gdd/16-5).
+  function recordHit(game, hp, absorbed) {
+    game.lastHit = { hp, absorbed };
+    return game.lastHit;
+  }
+
   function applyDamageToBoss(game, rawDamage) {
     let dmg = rawDamage;
     // 파훼 사혈 노출(+50%)과 아우라(+N%)는 가산 후 한 번에 곱연산 (gdd/06 6-3)
@@ -260,6 +271,7 @@ const TS_Engine = (() => {
     const absorbed = Math.min(game.bossBlock, dmg);
     game.bossBlock -= absorbed;
     game.bossHp -= dmg - absorbed;
+    recordHit(game, dmg - absorbed, absorbed);
     return dmg;
   }
 
@@ -274,6 +286,7 @@ const TS_Engine = (() => {
       game.evadeCharges -= 1;
       pushLog(game, `흘리기 — 일격을 넘겼습니다. (남은 횟수 ${game.evadeCharges})`);
       pushFx(game, 'evade', {});
+      recordHit(game, 0, 0);
       return 0;
     }
     let dmg = rawDamage;
@@ -291,6 +304,7 @@ const TS_Engine = (() => {
     const absorbed = Math.min(usableBlock, dmg);
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
+    const hit = { hp: dmg - absorbed, absorbed };
 
     // 반격 (백 '반탄강기') — 이번 적 페이즈의 매 피격마다 돌려준다.
     // 소모되지 않고, 다음 내 합이 시작될 때 사라진다.
@@ -298,8 +312,13 @@ const TS_Engine = (() => {
       const counter = game.counterDamage;
       applyDamageToBoss(game, counter);
       pushLog(game, `반탄! ${counter} 피해를 돌려줍니다.`);
-      pushFx(game, 'playerAttack', { amount: counter, label: '반탄' });
+      // 적의 방어도에 막힌 뒤의 값으로 싣는다 (game.lastHit는 방금 적을 때린 것)
+      pushFx(game, 'playerAttack', {
+        amount: counter, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, label: '반탄',
+      });
     }
+    // 반탄이 lastHit를 덮어썼다. 이 함수의 결과는 "플레이어가 맞은 것"이다.
+    recordHit(game, hit.hp, hit.absorbed);
     return dmg;
   }
 
@@ -373,7 +392,9 @@ const TS_Engine = (() => {
       extra = ' 사혈 노출(다음 피격 +50%).';
     }
     pushLog(game, `[${skill.name}](틈 ${cost}${isCloser ? ' · 관통' : ''}) — ${dmg} 피해.${extra}`);
-    pushFx(game, 'enemyAttack', { name: skill.name, amount: dmg, cost });
+    pushFx(game, 'enemyAttack', {
+      name: skill.name, amount: dmg, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, cost,
+    });
   }
 
   // 게이지가 0 이상인 동안 기술을 반복 사용, 음수가 되면 종료 (gdd/08 8-1)
@@ -504,7 +525,9 @@ const TS_Engine = (() => {
     if (precise && n === 1) {
       pushLog(game, `검(劍) — 적1로 정확히 마감. 추가 피해 ${precise}.`);
       applyDamageToBoss(game, precise);
-      pushFx(game, 'playerAttack', { amount: precise, label: '검(劍)' });
+      pushFx(game, 'playerAttack', {
+        amount: precise, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, label: '검(劍)',
+      });
       if (checkWinLose(game)) return;
     }
     // 곤(棍) — 방어도를 남긴 채 넘기면 다음 합이 한 칸 깊어진다.
@@ -637,7 +660,9 @@ const TS_Engine = (() => {
     if (effectiveDamage > 0) {
       const dealt = applyDamageToBoss(game, effectiveDamage);
       pushLog(game, `[${card.name}] 사용 — ${dealt} 피해.`);
-      pushFx(game, 'playerAttack', { amount: dealt, label: card.name });
+      pushFx(game, 'playerAttack', {
+        amount: dealt, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, label: card.name,
+      });
       // 흡혈 (자) — 입힌 피해의 N%를 회복
       if (card.lifesteal) {
         const healed = healPlayer(game, Math.round(dealt * card.lifesteal / 100));

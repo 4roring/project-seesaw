@@ -195,10 +195,7 @@ const TS_UI = (() => {
     els['enemy-avatar'].textContent = g.enemyIcon;
     els['enemy-name'].textContent = g.enemyName;
 
-    els['player-hp-fill'].style.width = Math.max(0, (g.playerHp / g.playerMaxHp) * 100) + '%';
-    els['player-hp-text'].textContent = `${Math.max(0, g.playerHp)} / ${g.playerMaxHp}`;
-    els['boss-hp-fill'].style.width = Math.max(0, (g.bossHp / g.bossMaxHp) * 100) + '%';
-    els['boss-hp-text'].textContent = `${Math.max(0, g.bossHp)} / ${g.bossMaxHp}`;
+    renderHpBars(g);
 
     // 배지
     els['boss-badges'].innerHTML = '';
@@ -448,6 +445,7 @@ const TS_UI = (() => {
     heal: 150,
     enemyBuff: 500,
     enemyAttack: 560,
+    evade: 420,
     gaugeStep: 380,
     memory: 360,
     break: 780,
@@ -459,6 +457,7 @@ const TS_UI = (() => {
     fxTimers.forEach(clearTimeout);
     fxTimers = [];
     fxPlaying = false;
+    hpShow = null;
     if (els['screen-battle']) els['screen-battle'].classList.remove('enemy-acting');
   }
 
@@ -468,6 +467,17 @@ const TS_UI = (() => {
     clearFxTimers();
     if (!pending.length) { settleGauge(); return; }
     fxPlaying = true;
+    // 연출을 되감아 "시작 시점의 체력"을 만든다. 실제 값에서 앞으로 보여줄
+    // 피해를 도로 더하고 회복을 빼면 된다. 재생이 끝나면 다시 실제 값에
+    // 정확히 도달한다 — 어긋나도 settle이 진실로 되돌린다.
+    const sum = (type, f) => pending.filter((x) => x.type === type)
+      .reduce((n, x) => n + f(x), 0);
+    hpShow = {
+      player: g.playerHp + sum('enemyAttack', fxHpLoss) - sum('heal', (x) => x.amount || 0),
+      boss: g.bossHp + sum('playerAttack', fxHpLoss),
+    };
+    renderHpBars(g);
+
     // 적 페이즈가 2초쯤 걸리게 됐다. 그동안 다음 합의 손패가 멀쩡히 떠
     // 있으면 누구 차례인지 안 읽힌다 — 눌러도 초식이 안 나가므로(건너뛰기로
     // 쓰인다) 죽여 두는 것이 정직하다.
@@ -496,6 +506,7 @@ const TS_UI = (() => {
     const run = TS_Run.get();
     if (run.phase !== 'BATTLE' || !run.game) return;
     if (els['gauge-marker']) els['gauge-marker'].style.left = gaugePercent(run.game.gauge) + '%';
+    renderHpBars(run.game);
     renderGaugeCaption(run.game);
     decorateTerms(els['gauge-caption']);
   }
@@ -510,21 +521,30 @@ const TS_UI = (() => {
   }
 
   function playFx(fx) {
+    const g = TS_Run.get().game;
     if (fx.type === 'playerAttack') {
       animate(els['player-avatar'], 'attacking');
       animate(els['enemy-avatar'], 'hit');
-      floatNum(els['enemy-fx'], `-${fx.amount}`, 'dmg');
+      floatNum(els['enemy-fx'], hitText(fx), 'dmg', true);
       if (fx.label) floatNum(els['player-fx'], fx.label, 'skill');
+      if (hpShow && g) { hpShow.boss -= fxHpLoss(fx); renderHpBars(g); }
     } else if (fx.type === 'enemyAttack') {
       animate(els['enemy-avatar'], 'attacking');
       animate(els['player-avatar'], 'hit');
-      floatNum(els['player-fx'], `-${fx.amount}`, 'dmg');
+      floatNum(els['player-fx'], hitText(fx), 'dmg', true);
       floatNum(els['enemy-fx'], fx.name, 'skill');
+      if (hpShow && g) { hpShow.player -= fxHpLoss(fx); renderHpBars(g); }
+    } else if (fx.type === 'evade') {
+      // 흘리기는 지금까지 아무것도 안 보여줬다 — 적의 일격이 통째로
+      // 사라지는데 화면에는 아무 일도 안 일어나 버그처럼 보였다.
+      animate(els['player-avatar'], 'buffing');
+      floatNum(els['player-fx'], '흘림', 'skill');
     } else if (fx.type === 'enemyBuff') {
       animate(els['enemy-avatar'], 'buffing');
       floatNum(els['enemy-fx'], fx.name, 'skill');
     } else if (fx.type === 'heal') {
       floatNum(els['player-fx'], `+${fx.amount}`, 'heal');
+      if (hpShow && g) { hpShow.player += fx.amount; renderHpBars(g); }
     } else if (fx.type === 'memory') {
       moveGauge(fx.to);
       dropMemory(fx.to);
@@ -544,12 +564,43 @@ const TS_UI = (() => {
     setTimeout(() => el.classList.remove(cls), 700);
   }
 
-  function floatNum(layer, text, cls) {
+  // html=true는 우리가 만든 문자열에만 쓴다 (hitText). 적 초식 이름 같은
+  // 데이터 문자열은 textContent로 넣는다.
+  function floatNum(layer, text, cls, html) {
     const div = document.createElement('div');
     div.className = `float-num ${cls}`;
-    div.textContent = text;
+    if (html) div.innerHTML = text; else div.textContent = text;
     layer.appendChild(div);
     setTimeout(() => div.remove(), 1100);
+  }
+
+  // 연출이 도는 동안의 "표시용 체력". null이면 실제 값을 그린다.
+  // 엔진은 합이 끝나는 순간 피해를 전부 적용해 버리므로, 이것이 없으면
+  // 적의 공격이 하나씩 재생되는 2초 내내 체력은 이미 다 깎여 있다.
+  let hpShow = null;
+
+  function renderHpBars(g) {
+    const php = hpShow ? hpShow.player : g.playerHp;
+    const bhp = hpShow ? hpShow.boss : g.bossHp;
+    els['player-hp-fill'].style.width = Math.max(0, (php / g.playerMaxHp) * 100) + '%';
+    els['player-hp-text'].textContent = `${Math.max(0, Math.round(php))} / ${g.playerMaxHp}`;
+    els['boss-hp-fill'].style.width = Math.max(0, (bhp / g.bossMaxHp) * 100) + '%';
+    els['boss-hp-text'].textContent = `${Math.max(0, Math.round(bhp))} / ${g.bossMaxHp}`;
+  }
+
+  // 타격 하나가 체력에서 실제로 가져간 양. fx.hp가 없는 옛 연출(또는
+  // 방어도가 없던 경우)은 타격 크기를 그대로 쓴다.
+  function fxHpLoss(fx) { return fx.hp != null ? fx.hp : (fx.amount || 0); }
+
+  // 막대가 3 줄었는데 숫자가 -13이면 둘이 서로를 부정한다. 실제로 깎인
+  // 체력을 말하고, 방어도가 먹은 몫은 따로 붙인다.
+  function hitText(fx) {
+    const hp = fxHpLoss(fx);
+    const blocked = fx.absorbed || 0;
+    if (hp <= 0 && blocked > 0) return '<small>막음 ' + blocked + '</small>';
+    // 막힌 몫은 작게 붙인다 — 같은 크기로 쓰면 24px 두 덩어리가 되어
+    // 아바타 밖으로 삐져나간다.
+    return blocked > 0 ? `-${hp}<small>막음 ${blocked}</small>` : `-${hp}`;
   }
 
   function moveGauge(to) {

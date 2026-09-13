@@ -743,3 +743,10 @@ button:hover { border-color: var(--text-dim); }
   transition: opacity 180ms ease;
 }
 .enemy-acting .card:hover { transform: none; box-shadow: none; }
+
+/* 방어도가 먹은 몫. 실제로 깎인 체력 옆에 작게 붙는다 — 같은 크기로 쓰면
+   24px 두 덩어리가 되어 아바타 밖으로 삐져나간다. */
+.float-num small {
+  font-size: 12px; font-weight: 700; margin-left: 5px;
+  color: var(--text-dim); opacity: 0.9;
+}
