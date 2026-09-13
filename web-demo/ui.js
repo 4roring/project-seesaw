@@ -20,7 +20,7 @@ const TS_UI = (() => {
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'log-fold', 'log-last',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
-      'screen-weapon', 'weapon-sub', 'weapon-grid', 'skip-weapon-btn', 'weapon-strip',
+      'screen-weapon', 'weapon-sub', 'weapon-grid', 'weapon-strip',
       'screen-crossroad', 'crossroad-sub', 'crossroad-grid',
       'screen-node', 'node-title', 'node-sub', 'node-body', 'node-echo',
       'result-title', 'result-sub', 'result-restart-btn',
@@ -634,7 +634,7 @@ const TS_UI = (() => {
   function renderWeaponSelect(run) {
     const color = D.COLORS[run.color] || {};
     els['weapon-sub'].textContent =
-      `${color.sect} · ${color.name} — 손은 둘뿐입니다. 한손 둘을 쥐거나, 양손 하나를 쥡니다.`;
+      `${color.sect} · ${color.name} — 병기는 한 자루만 쥡니다. 런 중에 바꾸려면 쥔 것을 놓습니다.`;
     els['weapon-grid'].innerHTML = '';
     Object.values(D.WEAPONS).forEach((w) => {
       const div = document.createElement('div');
@@ -642,7 +642,6 @@ const TS_UI = (() => {
       div.innerHTML = `
         <div class="wc-icon">${w.icon}</div>
         <div class="wc-name">${w.name}</div>
-        <div class="wc-hands">${w.hands === 1 ? '한손 · 손 하나가 남습니다' : '양손 · 손이 다 찹니다'}</div>
         <div class="wc-rule">${w.rule}</div>
         <div class="wc-flavor">${w.flavor}</div>`;
       div.addEventListener('click', () => { TS_Run.chooseWeapon(w.key); render(); });
@@ -1048,7 +1047,6 @@ const TS_UI = (() => {
     });
 
     on('skip-reward-btn', 'click', () => { TS_Run.skipReward(); resetBattleFx(); render(); });
-    on('skip-weapon-btn', 'click', () => { TS_Run.chooseWeapon(null); render(); });
 
     // 카드 밖을 누르면 고른 것을 놓는다 — 무르는 길이 없으면 두 단계
     // 탭이 오히려 갇힌 느낌을 준다.

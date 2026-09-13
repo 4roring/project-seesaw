@@ -40,7 +40,7 @@ python3 -m http.server 8000
 | 런 구조(스테이지 1~10, 덱 10→20장, 스테이지 간 회복) | [09](../gdd/09-run-structure.md) |
 | 적 10종 — 개성 두 축과 스테이지 편성 | [10](../gdd/10-enemy-roster.md) |
 | 갈림길 — 수련장·주루·문파 방문·비무대회·기연 | [13](../gdd/13-crossroads.md) |
-| 신병이기 — 슬롯 2칸, 규칙을 비트는 무기 5종 | [14](../gdd/14-weapons.md) |
+| 신병이기 — 한 자루, 규칙을 비트는 무기 6종 | [14](../gdd/14-weapons.md) |
 | 유물 — 자리 3칸, 강호행의 규칙을 비트는 5종 | [15](../gdd/15-relics.md) |
 | 무림 용어·작명·이름 저작권 원칙 | [12](../gdd/12-murim-terms.md) |
 | 4문파·경지·강화 | [11](../gdd/11-card-tiers.md) |
@@ -105,7 +105,7 @@ TS_Sim.run('RED', 60, { search: true });   // 최적에 가까운 플레이
 TS_Sim.run('RED', 120, { casual: true });  // 무지성 플레이 (하한)
 TS_Sim.lint();                             // 데이터 점검 (아래 참고)
 
-// 무기를 고정해 한 자루씩 재기 (null = 맨손, 'random' = 무작위)
+// 무기를 고정해 한 자루씩 재기 (생략 또는 'random' = 무작위)
 TS_Sim.run('RED', 90, { casual: true, weapon: 'spear' });
 TS_Sim.run('RED', 90, { casual: true, relic: 'mirror' });
 TS_DATA.WEAPONS_ENABLED = false;           // 무기 축을 통째로 끄고 비교

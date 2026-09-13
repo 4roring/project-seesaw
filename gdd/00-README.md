@@ -23,7 +23,7 @@
 | [11-card-tiers.md](11-card-tiers.md) | 경지(티어) 체계 + 컬러별 출구 메커니즘 + 카드 목록 |
 | [12-murim-terms.md](12-murim-terms.md) | 무림 용어 정본, 작명 규칙, 이름에 관한 저작권 원칙 |
 | [13-crossroads.md](13-crossroads.md) | 갈림길 — 비무 사이의 걸음(수련장·주루·문파 방문·비무대회·기연) |
-| [14-weapons.md](14-weapons.md) | 신병이기 — 문파와 곱해지는 둘째 축. 슬롯 2칸 · 규칙 수정자 |
+| [14-weapons.md](14-weapons.md) | 신병이기 — 문파와 곱해지는 둘째 축. 한 자루 · 규칙 수정자 |
 | [15-relics.md](15-relics.md) | 유물 — 강호행(걸음·보상·정보)의 규칙을 비트는 물건. 자리 3칸 |
 | [16-onboarding.md](16-onboarding.md) | 온보딩 — 가르칠 규칙은 둘뿐. 화면·안내 페이지·용어 점선·첫 합 코치마크 |
 

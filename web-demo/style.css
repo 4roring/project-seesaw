@@ -459,7 +459,6 @@ button:hover { border-color: var(--text-dim); }
 .weapon-card:hover { transform: translateY(-4px); border-color: var(--break); }
 .weapon-card .wc-icon { font-size: 28px; line-height: 1; }
 .weapon-card .wc-name { font-weight: 700; font-size: 15px; }
-.weapon-card .wc-hands { font-size: 11px; color: var(--text-dim); }
 .weapon-card .wc-rule {
   font-size: 12px; line-height: 1.5; color: var(--break);
   border-top: 1px dashed var(--panel-border); padding-top: 8px; margin-top: 2px;

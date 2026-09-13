@@ -7,7 +7,7 @@ const TS_Run = (() => {
     // SELECT | WEAPON | BATTLE | REWARD | CROSSROAD | NODE | RUN_WON | RUN_LOST
     phase: 'SELECT',
     color: null,
-    weapons: [],       // 손에 쥔 신병이기 (키 배열). 손은 둘뿐 (gdd/14)
+    weapons: [],       // 손에 쥔 신병이기 (키 배열). 한 자루만 (gdd/14 14-2)
     weaponOffer: null, // 런 중에 제안된 무기
     relics: [],        // 지닌 유물 (gdd/15). 강호행의 규칙을 비튼다
     relicOffer: null,
@@ -128,28 +128,21 @@ const TS_Run = (() => {
   }
 
   // ── 신병이기 (gdd/14) ───────────────────────────────────────
-  function handsUsed() {
-    return state.weapons.reduce((n, k) => n + ((D.WEAPONS[k] || {}).hands || 0), 0);
-  }
-  function handsFree() { return D.WEAPON_SLOTS - handsUsed(); }
+  // 병기는 한 자루만 쥔다. 새 병기를 쥐려면 쥔 것을 놓는다 (14-2).
   function canEquip(key) {
-    const w = D.WEAPONS[key];
-    return !!w && !state.weapons.includes(key) && w.hands <= handsFree();
+    return !!D.WEAPONS[key] && !state.weapons.includes(key);
   }
-  // 시작 시 한 자루. 양손 무기를 고르면 손이 다 차고, 한손을 고르면
-  // 한 칸이 남아 런 중에 하나를 더 쥘 수 있다 (14-2).
+  // 시작 시 한 자루. 맨손으로 나서는 길은 없다 (14-5).
   function chooseWeapon(key) {
     if (state.phase !== 'WEAPON') return;
-    if (key && !canEquip(key)) return;
-    if (key) state.weapons.push(key);
+    if (!canEquip(key)) return;
+    state.weapons = [key];
     startBattle();
   }
-  // 런 중 획득 — 손이 비었으면 그냥 쥐고, 다 찼으면 하나를 놓는다 (14-5)
-  function takeWeapon(key, dropKey) {
-    if (!D.WEAPONS[key] || state.weapons.includes(key)) return false;
-    if (dropKey) state.weapons = state.weapons.filter((k) => k !== dropKey);
+  // 런 중 획득 — 쥔 것이 있으면 놓고 쥔다 (14-5)
+  function takeWeapon(key) {
     if (!canEquip(key)) return false;
-    state.weapons.push(key);
+    state.weapons = [key];
     return true;
   }
 
@@ -332,7 +325,7 @@ const TS_Run = (() => {
     openCrossroad();
   }
 
-  // 아직 안 쥔 무기 중 하나. 손이 다 찼으면 "무엇을 놓을지"는 UI가 묻는다.
+  // 아직 안 쥔 무기 중 하나. 쥔 것을 놓을지는 제안 화면이 묻는다.
   function rollWeaponOffer() {
     const pool = Object.keys(D.WEAPONS).filter((k) => !state.weapons.includes(k));
     if (!pool.length) return null;
@@ -480,11 +473,11 @@ const TS_Run = (() => {
     const options = [];
     if (weaponKey) {
       const w = D.WEAPONS[weaponKey];
-      const canTake = w.hands <= handsFree();
+      const held = state.weapons[0];
       options.push({
-        id: canTake ? `wtake:${weaponKey}` : `wswap:${weaponKey}:${state.weapons.join('+')}`,
-        name: `${w.icon} ${w.name}`, tag: canTake ? `${w.hands}손` : '교체',
-        desc: `${w.rule}\n${canTake ? w.flavor : '쥐던 것을 놓습니다: ' + state.weapons.map((k) => D.WEAPONS[k].name).join(' · ')}`,
+        id: held ? `wswap:${weaponKey}:${held}` : `wtake:${weaponKey}`,
+        name: `${w.icon} ${w.name}`, tag: held ? '교체' : '병기',
+        desc: `${w.rule}\n${held ? '쥐던 것을 놓습니다: ' + D.WEAPONS[held].name : w.flavor}`,
       });
     }
     if (relicKey) {
@@ -521,34 +514,22 @@ const TS_Run = (() => {
     return { title, sub: `${rl.icon} ${rl.name} — ${rl.rule}`, options };
   }
 
-  // 무기 제안. 손이 비어 있으면 쥐거나 지나가고, 다 찼으면 무엇을 놓을지
-  // 고른다 — 버리는 것이 있어야 무기 교체에 무게가 생긴다 (gdd/14 14-5).
+  // 무기 제안. 한 자루만 쥐므로 늘 "놓고 쥐거나, 지나가거나"다 —
+  // 버리는 것이 있어야 무기 교체에 무게가 생긴다 (gdd/14 14-5).
   function weaponOfferView(key, title) {
     const w = D.WEAPONS[key];
+    const held = state.weapons[0];
     const options = [];
-    if (w.hands <= handsFree()) {
+    if (!held) {
       options.push({ id: `wtake:${key}`, name: `${w.icon} ${w.name}을(를) 쥔다`,
-        tag: `${w.hands}손`, desc: `${w.rule}\n${w.flavor}` });
+        tag: '병기', desc: `${w.rule}\n${w.flavor}` });
     } else {
-      state.weapons.forEach((k) => {
-        const cur = D.WEAPONS[k];
-        // 놓아서 자리가 나는 것만 제시한다
-        if (w.hands <= handsFree() + cur.hands) {
-          options.push({ id: `wswap:${key}:${k}`, name: `${cur.name}을(를) 놓고 ${w.name}을(를) 쥔다`,
-            tag: '교체', desc: `놓는 것: ${cur.rule}\n쥐는 것: ${w.rule}` });
-        }
-      });
-      // 한손 둘을 쥔 채 양손 무기를 만나면 한 자루만 놓아서는 자리가 안 난다.
-      // 이 경우가 막히면 "한손 둘 → 양손 하나"로 갈아탈 길이 아예 없어진다.
-      if (!options.length && state.weapons.length > 1) {
-        options.push({ id: `wswap:${key}:${state.weapons.join('+')}`,
-          name: `쥔 것을 모두 놓고 ${w.name}을(를) 쥔다`, tag: '교체',
-          desc: `놓는 것: ${state.weapons.map((k) => D.WEAPONS[k].name).join(' · ')}\n쥐는 것: ${w.rule}` });
-      }
+      const cur = D.WEAPONS[held];
+      options.push({ id: `wswap:${key}:${held}`, name: `${cur.name}을(를) 놓고 ${w.name}을(를) 쥔다`,
+        tag: '교체', desc: `놓는 것: ${cur.rule}\n쥐는 것: ${w.rule}` });
     }
     options.push({ id: 'wleave', name: '그냥 지나간다', tag: '거절',
-      desc: handsFree() > 0 ? '지금 병기가 손에 맞습니다.'
-        : '손에 익은 것을 놓을 이유가 없습니다.' });
+      desc: '손에 익은 것을 놓을 이유가 없습니다.' });
     return { title, sub: `${w.icon} ${w.name} — ${w.rule}`, options };
   }
 
@@ -675,9 +656,7 @@ const TS_Run = (() => {
       }
       if (id.startsWith('wswap:')) {
         const [, k, drop] = id.split(':');
-        const dropKeys = drop.split('+');
-        const dropped = dropKeys.map((d) => D.WEAPONS[d].name).join(' · ');
-        state.weapons = state.weapons.filter((x) => !dropKeys.includes(x));
+        const dropped = D.WEAPONS[drop].name;
         takeWeapon(k);
         finishNode(`신병이기 — ${dropped}을(를) 놓고 ${D.WEAPONS[k].name}을(를) 쥐었습니다.`);
         return;
@@ -769,7 +748,7 @@ const TS_Run = (() => {
   return {
     get, newRun, chooseDeck, startBattle, syncBattleResult,
     takeRelic, rollRelicOffer, relicSlotsFree, hasRelic,
-    chooseWeapon, takeWeapon, canEquip, handsFree, handsUsed, rollWeaponOffer, weaponOfferView,
+    chooseWeapon, takeWeapon, canEquip, rollWeaponOffer, weaponOfferView,
     takeCard, skipReward, upgradableIndexes, currentEnemy,
     chooseNode, chooseNodeOption,
     // 시뮬레이터가 쓰는 것들

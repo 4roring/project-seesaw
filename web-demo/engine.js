@@ -59,7 +59,7 @@ const TS_Engine = (() => {
       // 손패 뚜껑은 문파마다 다르다 (gdd/07 7-2)
       handRefillCap: config.handCap != null ? config.handCap : D.HAND_REFILL_CAP,
 
-      // 신병이기 (gdd/14) — 규칙을 비트는 둘째 축. 손은 둘뿐이다.
+      // 신병이기 (gdd/14) — 규칙을 비트는 둘째 축. 한 자루만 쥔다.
       weapons: (config.weapons || []).map((w) => (typeof w === 'string' ? D.WEAPONS[w] : w)).filter(Boolean),
       // 유물 (gdd/15) — 대부분 런 층에서 작동하지만, 쓰러지는 순간과
       // 파훼처럼 전투 안에서만 관측되는 것은 엔진이 알아야 한다.
@@ -67,6 +67,7 @@ const TS_Engine = (() => {
       lastStandLeft: 0,  // 호심경 — 아래에서 채운다
       breakCount: 0,     // 오도비 — 런이 전투 후에 읽어 간다
       returnBonusNextTurn: 0, // 곤(棍) — 방어도를 남기면 다음 합이 깊어진다
+      bareFistNextTurn: 0,    // 권갑(拳甲) — 막지 않고 넘기면 다음 합 첫 공격이 무겁다
       // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
       // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
       minMomentumReturn: config.minReturn != null ? config.minReturn : D.MIN_MOMENTUM_RETURN,
@@ -215,7 +216,7 @@ const TS_Engine = (() => {
     return healed;
   }
 
-  // 무기 효과는 합산한다 — 한손 둘을 쥐면 두 효과를 동시에 받는다 (gdd/14 14-2).
+  // 쥔 병기의 규칙 값을 읽는다. 병기는 한 자루지만(gdd/14 14-2) 배열로 받는다.
   function weaponSum(game, field) {
     return game.weapons.reduce((sum, w) => sum + (w[field] || 0), 0);
   }
@@ -537,6 +538,13 @@ const TS_Engine = (() => {
     if (game.returnBonusNextTurn > 0) {
       pushLog(game, `곤(棍) — 방어도 ${game.playerBlock}을 남겨 다음 합이 깊어집니다.`);
     }
+    // 권갑(拳甲) — 곤과 같은 순간, 같은 값을 반대로 읽는다. 이번 합에 쓰지
+    // 않은 보너스는 여기서 덮여 사라진다 — "다음 합"까지만 유효하다.
+    const bare = weaponSum(game, 'bareFist');
+    game.bareFistNextTurn = (bare && game.playerBlock === 0) ? bare : 0;
+    if (game.bareFistNextTurn > 0) {
+      pushLog(game, `권갑(拳甲) — 막지 않고 넘겼습니다. 다음 합 첫 공격이 무거워집니다.`);
+    }
 
     resolveBossPhase(game, n);
     if (checkWinLose(game)) return;
@@ -620,7 +628,12 @@ const TS_Engine = (() => {
       } else if (after && game.cardsPlayedThisTurn > 0) {
         effectiveDamage -= after;
       }
-      // 창(槍) — 같은 초식을 거듭 찌를수록 매워진다
+      // 권갑(拳甲) — 막지 않고 넘긴 합 다음의 첫 공격. 쓰면 사라진다.
+      if (game.bareFistNextTurn > 0) {
+        effectiveDamage += game.bareFistNextTurn;
+        pushLog(game, `권갑(拳甲) — 막지 않고 넘긴 뒤의 첫 공격, 추가 피해 ${game.bareFistNextTurn}.`);
+        game.bareFistNextTurn = 0;
+      }
       // 창(槍) — 무거운 초식일수록 매섭다. 적(赤)의 일격이 "버퍼가 깊을 때"
       // 라면 이쪽은 "무거운 초식을 낼 때"라, 얕은 버퍼에서도 성립한다.
       const heavyMin = game.weapons.reduce((m, w) => (w.heavyCost ? Math.min(m, w.heavyCost) : m), 99);

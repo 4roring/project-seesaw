@@ -329,8 +329,9 @@ window.TS_Sim = (() => {
 
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
-    // 무기를 고정해 한 자루씩 재기 위한 손잡이. null이면 맨손,
-    // 'random'이면 무작위. 색 × 무기 20조합을 하나씩 가르려면 필요하다.
+    // 무기를 고정해 한 자루씩 재기 위한 손잡이. 생략하거나 'random'이면
+    // 무작위 — 맨손으로 나서는 길은 없다 (gdd/14 14-2). 색 × 무기 조합을
+    // 하나씩 가르려면 필요하다.
     const weapon = opts && opts.weapon;
     // 유물도 한 개씩 고정해 잰다 — 무기와 같은 이유다 (gdd/14-6).
     const relic = opts && opts.relic;
@@ -349,12 +350,13 @@ window.TS_Sim = (() => {
         st0.lastStandLeft = st0.relics.reduce((n, k) => n + (TS_DATA.RELICS[k].lastStand || 0), 0);
       }
       if (R.get().phase === 'WEAPON') {
-        let pick = null;
-        if (weapon === 'random') {
-          const keys = Object.keys(TS_DATA.WEAPONS);
-          pick = keys[Math.floor(Math.random() * keys.length)];
-        } else if (weapon) pick = weapon;
+        const keys = Object.keys(TS_DATA.WEAPONS);
+        const pick = weapon && weapon !== 'random'
+          ? weapon : keys[Math.floor(Math.random() * keys.length)];
         R.chooseWeapon(pick);
+        // 잘못된 키면 WEAPON에 멈춘 채 아래 루프가 break로 끝나고, 그 런은
+        // "1스테이지에서 죽었다"로 조용히 집계된다 — 여기서 끊는다.
+        if (R.get().phase === 'WEAPON') throw new Error(`쥘 수 없는 병기: ${pick}`);
       }
       let guard = 0, lastNodeId = null, nodeRepeat = 0;
       while (guard++ < 4000) {
@@ -409,7 +411,7 @@ window.TS_Sim = (() => {
     return {
       color,
       policy: search ? '탐색' : casual ? '초심자' : planned ? '계획' : '탐욕',
-      weapon: weapon || '맨손',
+      weapon: weapon || '무작위',
       relic: relic || '없음',
       clear: (clears / runs * 100).toFixed(0) + '%',
       avg: (sum / runs).toFixed(1),
