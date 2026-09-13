@@ -699,3 +699,37 @@ button:hover { border-color: var(--text-dim); }
   .rules-term { flex-direction: column; gap: 1px; }
   .rules-term dt { flex-basis: auto; }
 }
+
+/* ── 첫 합 코치마크 ──────────────────────────────────────────────
+   고리 안쪽만 밝고 바깥은 어둡게. box-shadow를 화면보다 크게 퍼뜨리면
+   구멍 뚫린 장막이 된다 — 가리킬 요소의 z-index를 건드리지 않아도 되어,
+   패널 안에 들어 있는 요소도 그대로 가리킬 수 있다. */
+.coach { position: fixed; inset: 0; z-index: 80; }
+.coach.hidden { display: none; }
+.coach-ring {
+  position: fixed;
+  border-radius: 8px;
+  border: 2px solid var(--break);
+  box-shadow: 0 0 0 9999px rgba(8, 8, 14, 0.76);
+  pointer-events: none;
+  transition: left 160ms ease, top 160ms ease, width 160ms ease, height 160ms ease;
+}
+.coach-tip {
+  position: fixed;
+  width: min(320px, calc(100vw - 20px));
+  padding: 13px 15px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--break);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.55);
+}
+.coach-step { font-size: 11px; color: var(--break); font-variant-numeric: tabular-nums; }
+.coach-text { margin: 6px 0 11px; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.coach-text b { color: var(--text); font-weight: 600; }
+.coach-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.coach-actions .primary-btn { margin: 0; padding: 8px 18px; font-size: 13px; align-self: auto; }
+.coach-actions .ghost-btn { padding: 8px 10px; font-size: 12px; }
+
+/* 규칙 창의 버튼 두 개 */
+.rules-box .rules-fold + #rules-coach { margin-top: 12px; }
+#rules-coach { display: block; width: 100%; margin-top: 12px; }

@@ -16,7 +16,7 @@ const TS_UI = (() => {
       'intent-preview', 'boss-skill-legend',
       'surge-meter',
       'rules-btn', 'rules-overlay', 'rules-body', 'rules-close', 'rules-terms',
-      'term-pop',
+      'term-pop', 'coach', 'coach-ring', 'coach-tip', 'rules-coach',
       'play-zone', 'combo-dots', 'hand-row', 'pile-counts', 'draw-btn', 'log-panel',
       'log-fold', 'log-last',
       'reward-title', 'reward-sub', 'reward-heading', 'reward-grid', 'skip-reward-btn',
@@ -259,6 +259,10 @@ const TS_UI = (() => {
     els['log-last'].textContent = g.log[g.log.length - 1] || '기록';
 
     playPendingFx(g);
+
+    // 화면을 다 그린 뒤에 띄운다 — 중간에 띄우면 아직 자리가 안 잡힌
+    // 요소를 가리킨다.
+    maybeStartCoach(run);
   }
 
   // 기세 축 아래 한 줄. 규칙("0을 넘기면 선이 넘어간다")과 지금 당장 필요한
@@ -832,6 +836,30 @@ const TS_UI = (() => {
     });
     on('rules-close', 'click', () => toggleRules(false));
 
+    // 코치마크 — 어디를 눌러도 다음으로 간다. 되돌아갈 길은 두지 않았다:
+    // 네 단계뿐이고, 규칙 창에서 통째로 다시 부를 수 있다.
+    on('rules-coach', 'click', () => {
+      toggleRules(false);
+      // 전투 화면이 아니면 가리킬 것이 없다
+      if (TS_Run.get().phase !== 'BATTLE') return;
+      startCoach();
+    });
+    on('coach', 'click', (e) => {
+      if (e.target.dataset && e.target.dataset.coach === 'skip') { endCoach(); return; }
+      nextCoachStep();
+    });
+    // 화면 크기가 바뀌면 고리가 엉뚱한 곳을 가리킨다
+    window.addEventListener('resize', () => { if (coachStep !== -1) showCoachStep(); });
+    // 코치가 떠 있는 동안 화면이 움직이면 고리가 어긋난다. 여기서는 다시
+    // 스크롤하지 않고 위치만 다시 잡는다 — showCoachStep을 부르면 스크롤이
+    // 스스로를 다시 부르는 고리가 된다.
+    window.addEventListener('scroll', () => {
+      if (coachStep === -1) return;
+      const step = COACH_STEPS[coachStep];
+      const target = step && document.querySelector(step.sel);
+      if (target) placeCoach(step, target);
+    }, true);
+
     // 용어 누르기. 문서 전체에 한 번만 걸어 둔다 — 매 렌더마다 점선을
     // 다시 만들기 때문에, 개별 span에 걸면 리스너가 계속 늘어난다.
     document.addEventListener('click', (e) => {
@@ -898,6 +926,126 @@ const TS_UI = (() => {
     on('result-restart-btn', 'click', restart);
   }
 
+  // ── 첫 합 코치마크 ─────────────────────────────────────────
+  // 규칙 두 개를 "읽는" 대신 "가리켜서" 가르친다. 첫 비무 1합에 한 번만
+  // 뜨고, 본 뒤에는 다시 안 뜬다. 규칙 창에서 다시 부를 수 있다.
+  //
+  // 마크업은 index.html에 두지 않고 여기서 만든다 — 화면 뼈대를
+  // index.html에만 두면 캐시된 브라우저에서 기능이 통째로 사라진다
+  // (ensureChrome 주석 참고).
+  const COACH_KEY = 'ts-coach-done';
+  const COACH_STEPS = [
+    {
+      sel: '#gauge-track',
+      text: '기세는 <b>하나를 둘이 나눠 씁니다.</b> 초식을 쓰면 오른쪽으로 밀리고, '
+        + '<b>0을 넘기는 순간</b> 선이 적에게 넘어가 이 합이 끝납니다.',
+    },
+    {
+      sel: '.hand-row .card',
+      text: '초식마다 왼쪽 위에 <b>틈</b>이 있습니다. 쓰면 그만큼 기세가 밀립니다 — '
+        + '<b>이 수가 곧 "합을 얼마나 쓰는가"</b>입니다.',
+    },
+    {
+      sel: '#surge-meter',
+      text: '이번 합에 쓴 틈의 <b>합계</b>가 적의 <b>빈틈</b>에 닿은 채로 선을 넘기면 '
+        + '<b>파훼</b> — 적의 반격이 통째로 사라집니다. 나눠 때리면 아무 일도 없습니다.',
+    },
+    {
+      sel: '#rules-btn',
+      text: '여기서 규칙과 용어를 언제든 다시 볼 수 있습니다. '
+        + '화면 설명문에 <b>점선 친 말</b>은 눌러 보면 뜻이 뜹니다.',
+    },
+  ];
+  let coachStep = -1; // -1이면 꺼져 있음
+
+  function coachSeen() {
+    try { return localStorage.getItem(COACH_KEY) === '1'; } catch (e) { return false; }
+  }
+  function markCoachSeen() {
+    try { localStorage.setItem(COACH_KEY, '1'); } catch (e) { /* 사생활 모드 등 */ }
+  }
+
+  function maybeStartCoach(run) {
+    if (coachStep !== -1 || coachSeen()) return;
+    if (run.phase !== 'BATTLE' || run.stage !== 1 || run.game.turn !== 1) return;
+    startCoach();
+  }
+
+  function startCoach() {
+    coachStep = 0;
+    showCoachStep();
+  }
+
+  function endCoach() {
+    coachStep = -1;
+    markCoachSeen();
+    if (els['coach']) els['coach'].classList.add('hidden');
+  }
+
+  function nextCoachStep() {
+    coachStep += 1;
+    if (coachStep >= COACH_STEPS.length) { endCoach(); return; }
+    showCoachStep();
+  }
+
+  function showCoachStep() {
+    const box = els['coach'];
+    if (!box) { coachStep = -1; return; }
+    const step = COACH_STEPS[coachStep];
+    if (!step) { endCoach(); return; }
+    const target = document.querySelector(step.sel);
+    // 가리킬 것이 없으면 그 단계는 건너뛴다 (좁은 화면에서 숨긴 요소 등)
+    if (!target) { nextCoachStep(); return; }
+
+    box.classList.remove('hidden');
+    // 가리킬 것이 스크롤 아래에 있을 수 있다. 고리와 말풍선은 fixed라
+    // 데려오지 않으면 화면 밖을 가리킨다 — 실제로 손패와 몰아치기 바에서
+    // 그랬다. 즉시 스크롤하고, 자리가 잡힌 다음 프레임에 그린다.
+    target.scrollIntoView({ block: 'center', behavior: 'auto' });
+    // 곧바로 그린다. rAF에 내용 갱신까지 맡겼더니, 프레임이 늦는 환경에서
+    // 단계는 넘어갔는데 문구는 옛것이 남았다 — 배경 탭에서는 rAF가 아예
+    // 돌지 않는다. 위치만 한 프레임 뒤에 한 번 더 잡는다.
+    placeCoach(step, target);
+    requestAnimationFrame(() => {
+      if (coachStep !== -1 && COACH_STEPS[coachStep] === step) placeCoach(step, target);
+    });
+  }
+
+  function placeCoach(step, target) {
+    const box = els['coach'];
+    if (!box || coachStep === -1) return;
+    const pad = 6;
+    const r = target.getBoundingClientRect();
+    const ring = els['coach-ring'];
+    ring.style.left = `${Math.round(r.left - pad)}px`;
+    ring.style.top = `${Math.round(r.top - pad)}px`;
+    ring.style.width = `${Math.round(r.width + pad * 2)}px`;
+    ring.style.height = `${Math.round(r.height + pad * 2)}px`;
+
+    const last = coachStep === COACH_STEPS.length - 1;
+    const tip = els['coach-tip'];
+    tip.innerHTML = `<div class="coach-step">${coachStep + 1} / ${COACH_STEPS.length}</div>`
+      + `<p class="coach-text">${step.text}</p>`
+      + '<div class="coach-actions">'
+      + '<button class="ghost-btn" data-coach="skip">건너뛰기</button>'
+      + `<button class="primary-btn" data-coach="next">${last ? '시작합니다' : '다음'}</button>`
+      + '</div>';
+
+    // 고리를 피해 위아래 중 자리가 넓은 쪽에 붙인다
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    const tr = tip.getBoundingClientRect();
+    const margin = 10;
+    let left = r.left + r.width / 2 - tr.width / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - tr.width - margin));
+    const below = r.bottom + pad + 10;
+    const top = (below + tr.height <= window.innerHeight - margin)
+      ? below
+      : Math.max(margin, r.top - pad - 10 - tr.height);
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+  }
+
   // ── 캐시된 index.html에 대한 보험 ───────────────────────────
   // 이 프로젝트는 같은 사고를 이미 겪었다 — 스크립트를 나눴다가 캐시된
   // index.html이 새 파일을 안 불러 화면이 통째로 죽었다(README 참고).
@@ -921,9 +1069,19 @@ const TS_UI = (() => {
         + '<summary class="rules-fold-sum">용어 한 눈에</summary>'
         + '<dl class="rules-terms" id="rules-terms"></dl>'
         + '</details>'
+        + '<button class="ghost-btn" id="rules-coach">안내 다시 보기</button>'
         + '<button class="primary-btn" id="rules-close">알겠습니다</button>'
         + '</div>';
       app.appendChild(ov);
+    }
+
+    if (!$('coach')) {
+      const coach = document.createElement('div');
+      coach.className = 'coach hidden';
+      coach.id = 'coach';
+      coach.innerHTML = '<div class="coach-ring" id="coach-ring"></div>'
+        + '<div class="coach-tip" id="coach-tip"></div>';
+      app.appendChild(coach);
     }
 
     if (!$('term-pop')) {

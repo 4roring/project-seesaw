@@ -25,7 +25,7 @@
 | [13-crossroads.md](13-crossroads.md) | 갈림길 — 비무 사이의 걸음(수련장·주루·문파 방문·비무대회·기연) |
 | [14-weapons.md](14-weapons.md) | 신병이기 — 문파와 곱해지는 둘째 축. 슬롯 2칸 · 규칙 수정자 |
 | [15-relics.md](15-relics.md) | 유물 — 강호행(걸음·보상·정보)의 규칙을 비트는 물건. 자리 3칸 |
-| [16-onboarding.md](16-onboarding.md) | 온보딩 — 가르칠 규칙은 둘뿐. 화면·안내 페이지·용어 점선 세 겹 |
+| [16-onboarding.md](16-onboarding.md) | 온보딩 — 가르칠 규칙은 둘뿐. 화면·안내 페이지·용어 점선·첫 합 코치마크 |
 
 ## 한 줄 요약
 
