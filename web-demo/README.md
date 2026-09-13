@@ -66,6 +66,22 @@ UI는 1:1 가로 대전 구도(플레이어 ↔ 적)로, 공격/피격 모션, �
 > 지금은 `ui.js` 안에 있습니다. `guide.html`은 새 페이지라 이 문제가
 > 없습니다 — 대신 `data.js`와 `ui.js`만 읽고 `init()`은 부르지 않습니다.
 
+> **`index.html`에 새 요소를 더했다면 `ensureChrome()`에도 넣으세요.**
+> 위와 같은 사고가 반대 방향으로 한 번 더 났습니다 — 규칙 창(`#rules-body`)
+> 을 `index.html`에만 넣었더니, **예전 `index.html`을 캐시로 든 브라우저가
+> 새 `ui.js`만 받아** `buildRules()`가 null에 `innerHTML`을 쓰다 `init()`이
+> 통째로 멈췄습니다. 시작 화면이 아무것도 안 그려집니다.
+>
+> 그래서 `ui.js`의 `ensureChrome()`이 없는 뼈대를 직접 만듭니다. 정적
+> 이벤트도 `on(id, ...)`으로 걸어 요소가 없으면 그 하나만 빠집니다.
+>
+> 확인하는 법 — 예전 `index.html`을 꺼내 새 스크립트로 열어 봅니다:
+>
+> ```bash
+> git show <이전커밋>:web-demo/index.html > web-demo/_stale.html
+> # http://localhost:8123/_stale.html 을 열어 콘솔 오류 0인지 본다
+> ```
+
 ### 설명 문구는 한 곳에만 씁니다
 
 규칙은 `data.js`의 **`RULES`**, 용어는 **`GLOSSARY`** 하나입니다. 전투

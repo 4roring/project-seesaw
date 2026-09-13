@@ -724,6 +724,7 @@ const TS_UI = (() => {
   // 문장은 data.js의 RULES에서 읽는다 — 여기에 직접 쓰면 안내 페이지와
   // 어긋나고, 상수를 바꿔도 설명이 안 따라온다.
   function buildRules() {
+    if (!els['rules-body']) return;
     els['rules-body'].innerHTML = D.RULES.map((sec, i) => {
       const head = D.RULES.length - 1 === i
         ? `<h4 class="rules-sec">${sec.title}</h4>`
@@ -733,12 +734,14 @@ const TS_UI = (() => {
   }
 
   function buildRuleTerms() {
+    if (!els['rules-terms']) return;
     els['rules-terms'].innerHTML = D.GLOSSARY
       .map((t) => `<div class="rules-term"><dt>${t.term}</dt><dd>${t.desc}</dd></div>`)
       .join('');
   }
 
   function toggleRules(open) {
+    if (!els['rules-overlay']) return;
     els['rules-overlay'].classList.toggle('hidden', !open);
     if (open) hideTermPop();
   }
@@ -793,13 +796,13 @@ const TS_UI = (() => {
   }
 
   function hideTermPop() {
-    els['term-pop'].classList.add('hidden');
+    if (els['term-pop']) els['term-pop'].classList.add('hidden');
   }
 
   function showTermPop(span) {
     const desc = TERM_DESC.get(span.dataset.term);
-    if (!desc) return;
     const pop = els['term-pop'];
+    if (!desc || !pop) return;
     pop.innerHTML = `<b>${span.dataset.term}</b><span>${desc}</span>`;
     pop.classList.remove('hidden');
     // 먼저 보여야 크기를 알 수 있다. 화면 밖으로 나가면 안쪽으로 당긴다.
@@ -814,12 +817,20 @@ const TS_UI = (() => {
     pop.style.top = `${Math.round(Math.max(margin, top))}px`;
   }
 
+  // 없는 요소에 리스너를 걸다 죽지 않는다. 낡은 index.html을 캐시로 든
+  // 브라우저에서는 요소 하나가 빠지는 것으로 끝나야지, 게임 전체가
+  // 시작조차 못 하는 일이 되면 안 된다.
+  function on(id, ev, fn, opts) {
+    const el = els[id];
+    if (el) el.addEventListener(ev, fn, opts);
+  }
+
   function wireStaticEvents() {
-    els['rules-btn'].addEventListener('click', (e) => {
+    on('rules-btn', 'click', (e) => {
       e.stopPropagation(); // 전투 화면의 "고른 카드 놓기"까지 타지 않게
       toggleRules(true);
     });
-    els['rules-close'].addEventListener('click', () => toggleRules(false));
+    on('rules-close', 'click', () => toggleRules(false));
 
     // 용어 누르기. 문서 전체에 한 번만 걸어 둔다 — 매 렌더마다 점선을
     // 다시 만들기 때문에, 개별 span에 걸면 리스너가 계속 늘어난다.
@@ -844,7 +855,7 @@ const TS_UI = (() => {
     window.addEventListener('scroll', hideTermPop, true);
     window.addEventListener('resize', hideTermPop);
     // 바깥을 눌러도 닫힌다 — 창 안(.rules-box)을 누른 건 통과시킨다.
-    els['rules-overlay'].addEventListener('click', (e) => {
+    on('rules-overlay', 'click', (e) => {
       if (e.target === els['rules-overlay']) toggleRules(false);
     });
     document.addEventListener('keydown', (e) => {
@@ -853,11 +864,11 @@ const TS_UI = (() => {
       toggleRules(false);
     });
 
-    els['play-zone'].addEventListener('dragover', (e) => {
+    on('play-zone', 'dragover', (e) => {
       e.preventDefault(); els['play-zone'].classList.add('drag-over');
     });
-    els['play-zone'].addEventListener('dragleave', () => els['play-zone'].classList.remove('drag-over'));
-    els['play-zone'].addEventListener('drop', (e) => {
+    on('play-zone', 'dragleave', () => els['play-zone'].classList.remove('drag-over'));
+    on('play-zone', 'drop', (e) => {
       e.preventDefault();
       els['play-zone'].classList.remove('drag-over');
       const uid = e.dataTransfer.getData('text/plain');
@@ -866,39 +877,101 @@ const TS_UI = (() => {
 
     // 숨 고르기 — 틈 2짜리 초식과 동일하게 처리되며, 기세가 0을
     // 넘으면 그대로 선이 넘어간다 (gdd/07 7-1)
-    els['draw-btn'].addEventListener('click', () => {
+    on('draw-btn', 'click', () => {
       const run = TS_Run.get();
       if (run.phase !== 'BATTLE') return;
       TS_Engine.drawAction(run.game);
       afterAction();
     });
 
-    els['skip-reward-btn'].addEventListener('click', () => { TS_Run.skipReward(); resetBattleFx(); render(); });
-    els['skip-weapon-btn'].addEventListener('click', () => { TS_Run.chooseWeapon(null); render(); });
+    on('skip-reward-btn', 'click', () => { TS_Run.skipReward(); resetBattleFx(); render(); });
+    on('skip-weapon-btn', 'click', () => { TS_Run.chooseWeapon(null); render(); });
 
     // 카드 밖을 누르면 고른 것을 놓는다 — 무르는 길이 없으면 두 단계
     // 탭이 오히려 갇힌 느낌을 준다.
-    els['screen-battle'].addEventListener('click', () => {
+    on('screen-battle', 'click', () => {
       if (selectedUid) { selectedUid = null; render(); }
     });
 
     const restart = () => { TS_Run.newRun(); fxCursor = 0; render(); };
-    els['restart-btn'].addEventListener('click', restart);
-    els['result-restart-btn'].addEventListener('click', restart);
+    on('restart-btn', 'click', restart);
+    on('result-restart-btn', 'click', restart);
+  }
+
+  // ── 캐시된 index.html에 대한 보험 ───────────────────────────
+  // 이 프로젝트는 같은 사고를 이미 겪었다 — 스크립트를 나눴다가 캐시된
+  // index.html이 새 파일을 안 불러 화면이 통째로 죽었다(README 참고).
+  // 이번에는 반대 방향으로 같은 일이 났다: index.html에 요소를 새로
+  // 더했는데, 예전 index.html을 캐시로 든 브라우저가 새 ui.js만 받아
+  // buildRules()가 null에 innerHTML을 쓰다 init() 전체가 멈췄다.
+  //
+  // 그래서 화면 뼈대를 index.html에만 두지 않는다. 없으면 여기서 만든다 —
+  // 낡은 index.html에서도 기능이 죽지 않고 그대로 동작한다.
+  function ensureChrome() {
+    const app = document.getElementById('app') || document.body;
+
+    if (!$('rules-overlay')) {
+      const ov = document.createElement('div');
+      ov.className = 'rules-overlay hidden';
+      ov.id = 'rules-overlay';
+      ov.innerHTML = '<div class="rules-box">'
+        + '<h3 class="rules-title">규칙은 두 개뿐입니다</h3>'
+        + '<div class="rules-body" id="rules-body"></div>'
+        + '<details class="rules-fold" id="rules-term-fold">'
+        + '<summary class="rules-fold-sum">용어 한 눈에</summary>'
+        + '<dl class="rules-terms" id="rules-terms"></dl>'
+        + '</details>'
+        + '<button class="primary-btn" id="rules-close">알겠습니다</button>'
+        + '</div>';
+      app.appendChild(ov);
+    }
+
+    if (!$('term-pop')) {
+      const pop = document.createElement('div');
+      pop.className = 'term-pop hidden';
+      pop.id = 'term-pop';
+      app.appendChild(pop);
+    }
+
+    if (!$('rules-btn')) {
+      const head = document.querySelector('.header-right');
+      if (head) {
+        const btn = document.createElement('button');
+        btn.id = 'rules-btn';
+        btn.className = 'ghost-btn';
+        btn.textContent = '규칙 ?';
+        head.insertBefore(btn, head.firstChild);
+      }
+    }
+
+    if (!$('gauge-caption')) {
+      const track = $('gauge-track');
+      if (track && track.parentElement) {
+        const cap = document.createElement('div');
+        cap.className = 'gauge-caption';
+        cap.id = 'gauge-caption';
+        track.parentElement.insertBefore(cap, track.nextSibling);
+      }
+    }
   }
 
   function init() {
+    ensureChrome();
     cacheEls();
     buildGaugeTrack();
     buildRules();
     buildRuleTerms();
     // 용어 목록은 창 맨 아래에 있다. 펼치면 화면 밖에서 열려서 "눌렀는데
     // 아무 일도 없다"로 보인다 — 펼친 자리로 데려온다.
-    els['rules-terms'].parentElement.addEventListener('toggle', (e) => {
-      if (e.target.open) e.target.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
-    els['log-fold'].open = foldOpen('log');
-    rememberFold('log', els['log-fold']);
+    if (els['rules-terms'] && els['rules-terms'].parentElement) {
+      els['rules-terms'].parentElement.addEventListener('toggle', (e) => {
+        if (e.target.open) e.target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
+    }
+    if (els['log-fold']) {
+      els['log-fold'].open = foldOpen('log');
+      rememberFold('log', els['log-fold']);
+    }
     wireStaticEvents();
     TS_Run.newRun();
     render();
