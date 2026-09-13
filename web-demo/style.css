@@ -733,3 +733,13 @@ button:hover { border-color: var(--text-dim); }
 /* 규칙 창의 버튼 두 개 */
 .rules-box .rules-fold + #rules-coach { margin-top: 12px; }
 #rules-coach { display: block; width: 100%; margin-top: 12px; }
+
+/* 적이 움직이는 동안. 손패를 죽여 누구 차례인지 읽히게 한다 —
+   pointer-events는 남긴다. 이때의 입력은 "남은 연출 건너뛰기"다. */
+.enemy-acting .hand-row,
+.enemy-acting #draw-btn {
+  opacity: 0.42;
+  filter: grayscale(0.5);
+  transition: opacity 180ms ease;
+}
+.enemy-acting .card:hover { transform: none; box-shadow: none; }

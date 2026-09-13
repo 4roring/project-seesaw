@@ -386,6 +386,10 @@ const TS_Engine = (() => {
       const { skill, cost, isCloser } = pickBossSkill(game, game.bossCooldowns, streak, gauge);
       gauge -= cost;
       applyBossSkillEffect(game, skill, cost, isCloser);
+      // 적도 기세를 쓴다는 것이 보여야 한다. 한 수마다 위치를 남기지
+      // 않으면 화면에는 마지막 값 하나만 남아, 적 페이즈가 통째로
+      // "획 돌아오는" 한 번의 이동으로 보인다 (gdd/16-4).
+      pushFx(game, 'gaugeStep', { to: Math.max(gauge, D.GAUGE_MIN), cost, name: skill.name });
       if (skill.cooldown > 0) game.bossCooldowns[skill.key] = skill.cooldown;
       if (checkWinLose(game)) break;
     }

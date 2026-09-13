@@ -227,7 +227,11 @@ const TS_UI = (() => {
     g.activeEffects.filter((e) => e.kind === 'HEAL_ON_TURN_START')
       .forEach((e) => addBadge(els['player-badges'], 'block', `${e.name} 회복+${e.amount} (${e.turnsRemaining}합)`, true));
 
-    els['gauge-marker'].style.left = gaugePercent(g.gauge) + '%';
+    // 연출이 남아 있으면 마커는 연출이 옮긴다. 여기서 마지막 값으로 먼저
+    // 튕겨 놓으면 적이 기세를 쓰는 장면이 통째로 사라진다.
+    const gaugeFxPending = g.fx.slice(fxCursor)
+      .some((f) => f.type === 'gaugeStep' || f.type === 'memory');
+    if (!gaugeFxPending) els['gauge-marker'].style.left = gaugePercent(g.gauge) + '%';
     renderGaugeCaption(g);
     renderSurge(g);
 
@@ -416,6 +420,7 @@ const TS_UI = (() => {
   }
 
   function doPlayCard(uid) {
+    if (skipFx()) return; // 연출 중의 첫 입력은 건너뛰기다
     selectedUid = null;
     const run = TS_Run.get();
     if (run.phase !== 'BATTLE') return;
@@ -434,10 +439,74 @@ const TS_UI = (() => {
   }
 
   // ── 연출 재생 ───────────────────────────────────────────────
+  // 연출마다 머무는 시간이 다르다. 내 초식은 빠르게, 적 페이즈는 천천히 —
+  // 적도 기세를 "쓰고 있다"는 것이 보여야 한다. 예전에는 전부 180ms라
+  // 적의 두세 수가 한 덩어리로 지나가고, 기세는 마지막 값으로 한 번에
+  // 튕겼다 (gdd/16-4).
+  const FX_DWELL = {
+    playerAttack: 190,
+    heal: 150,
+    enemyBuff: 500,
+    enemyAttack: 560,
+    gaugeStep: 380,
+    memory: 360,
+    break: 780,
+  };
+  let fxTimers = [];
+  let fxPlaying = false;
+
+  function clearFxTimers() {
+    fxTimers.forEach(clearTimeout);
+    fxTimers = [];
+    fxPlaying = false;
+    if (els['screen-battle']) els['screen-battle'].classList.remove('enemy-acting');
+  }
+
   function playPendingFx(g) {
     const pending = g.fx.slice(fxCursor);
     fxCursor = g.fx.length;
-    pending.forEach((fx, i) => setTimeout(() => playFx(fx), i * 180));
+    clearFxTimers();
+    if (!pending.length) { settleGauge(); return; }
+    fxPlaying = true;
+    // 적 페이즈가 2초쯤 걸리게 됐다. 그동안 다음 합의 손패가 멀쩡히 떠
+    // 있으면 누구 차례인지 안 읽힌다 — 눌러도 초식이 안 나가므로(건너뛰기로
+    // 쓰인다) 죽여 두는 것이 정직하다.
+    const enemyActing = pending.some(
+      (f) => f.type === 'enemyAttack' || f.type === 'enemyBuff' || f.type === 'gaugeStep');
+    if (enemyActing && els['screen-battle']) {
+      els['screen-battle'].classList.add('enemy-acting');
+      // 캡션은 이미 끝난 합의 값("기세 아3")을 말하는데 마커는 아직 적
+      // 쪽에 있다. 적의 차례라고 말하게 두고, 건너뛰는 길도 여기서 알린다 —
+      // 그러지 않으면 빠져나갈 길이 있다는 걸 아무도 모른다.
+      if (els['gauge-caption']) {
+        els['gauge-caption'].textContent = '적의 합 — 아무 곳이나 눌러 넘길 수 있습니다';
+      }
+    }
+    let at = 0;
+    pending.forEach((fx) => {
+      fxTimers.push(setTimeout(() => playFx(fx), at));
+      at += FX_DWELL[fx.type] || 200;
+    });
+    fxTimers.push(setTimeout(settleGauge, at));
+  }
+
+  // 연출이 끝나면(또는 건너뛰면) 마커를 실제 값에 맞춘다.
+  function settleGauge() {
+    clearFxTimers();
+    const run = TS_Run.get();
+    if (run.phase !== 'BATTLE' || !run.game) return;
+    if (els['gauge-marker']) els['gauge-marker'].style.left = gaugePercent(run.game.gauge) + '%';
+    renderGaugeCaption(run.game);
+    decorateTerms(els['gauge-caption']);
+  }
+
+  // 느리게 만든 이상 빠져나갈 길이 있어야 한다 — 적 페이즈가 도는 동안
+  // 무엇을 누르면 먼저 "남은 연출 건너뛰기"로 쓰인다. 그 입력으로 초식이
+  // 나가지는 않는다(연출을 보는 중에 낸 카드는 대개 실수다).
+  function skipFx() {
+    if (!fxPlaying) return false;
+    settleGauge();
+    return true;
   }
 
   function playFx(fx) {
@@ -457,7 +526,12 @@ const TS_UI = (() => {
     } else if (fx.type === 'heal') {
       floatNum(els['player-fx'], `+${fx.amount}`, 'heal');
     } else if (fx.type === 'memory') {
+      moveGauge(fx.to);
       dropMemory(fx.to);
+    } else if (fx.type === 'gaugeStep') {
+      // 적이 틈을 치르는 순간. 마커만 움직인다 — 구슬까지 떨어뜨리면
+      // 한 페이즈에 네 번 쏟아져 무슨 일인지 안 읽힌다.
+      moveGauge(fx.to);
     } else if (fx.type === 'break') {
       breakFlash();
     }
@@ -476,6 +550,10 @@ const TS_UI = (() => {
     div.textContent = text;
     layer.appendChild(div);
     setTimeout(() => div.remove(), 1100);
+  }
+
+  function moveGauge(to) {
+    if (els['gauge-marker']) els['gauge-marker'].style.left = gaugePercent(to) + '%';
   }
 
   // 기세가 게이지 위로 떨어지는 연출
@@ -712,7 +790,12 @@ const TS_UI = (() => {
     return div;
   }
 
-  function resetBattleFx() { fxCursor = TS_Run.get().game ? TS_Run.get().game.fx.length : 0; }
+  // 전투를 떠날 때 부른다. 남은 타이머를 끄지 않으면 다음 화면에서
+  // 지난 전투의 연출이 뒤늦게 터진다.
+  function resetBattleFx() {
+    clearFxTimers();
+    fxCursor = TS_Run.get().game ? TS_Run.get().game.fx.length : 0;
+  }
 
   // ── 런 종료 ─────────────────────────────────────────────────
   function renderResult(run) {
@@ -906,6 +989,7 @@ const TS_UI = (() => {
     // 숨 고르기 — 틈 2짜리 초식과 동일하게 처리되며, 기세가 0을
     // 넘으면 그대로 선이 넘어간다 (gdd/07 7-1)
     on('draw-btn', 'click', () => {
+      if (skipFx()) return;
       const run = TS_Run.get();
       if (run.phase !== 'BATTLE') return;
       TS_Engine.drawAction(run.game);
@@ -918,10 +1002,11 @@ const TS_UI = (() => {
     // 카드 밖을 누르면 고른 것을 놓는다 — 무르는 길이 없으면 두 단계
     // 탭이 오히려 갇힌 느낌을 준다.
     on('screen-battle', 'click', () => {
+      if (skipFx()) return;
       if (selectedUid) { selectedUid = null; render(); }
     });
 
-    const restart = () => { TS_Run.newRun(); fxCursor = 0; render(); };
+    const restart = () => { clearFxTimers(); TS_Run.newRun(); fxCursor = 0; render(); };
     on('restart-btn', 'click', restart);
     on('result-restart-btn', 'click', restart);
   }
