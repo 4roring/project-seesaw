@@ -35,6 +35,7 @@
 | ✅ 채택 | `gdd/`로 졸업. **규칙 본문은 gdd에만 둡니다** |
 | 🔶 부분 채택 | 일부만 졸업. 무엇이 남았는지 노트 머리에 적습니다 |
 | ⏸ 보류 | 지금은 안 함. **지우지 말고** 이유를 남길 것 |
+| ↪ 대체 | 다른 노트가 자리를 가져감. **지우지 말고** 어디로 갔는지와 남길 원칙을 머리에 적을 것 |
 
 보류된 아이디어를 지우지 않는 이유: 같은 발상이 몇 달 뒤에 또 떠오르는데,
 그때 "왜 접었는지"가 남아 있으면 같은 검증을 두 번 하지 않아도 됩니다.
@@ -42,7 +43,26 @@
 **채택된 노트의 규칙 본문은 gdd로 옮기고 노트에는 남기지 않습니다.** 정본이
 둘이면 반드시 어긋나고, 그때 어느 쪽이 맞는지 아무도 모르게 됩니다.
 
-## 지금 무엇을 하고 있나 (2026-09-07)
+## 지금 무엇을 하고 있나 (2026-09-15)
+
+**방향이 바뀌었습니다.** [017](017-weapon-lineages.md) — 캐릭터를 문파가
+아니라 **무기 계열(검·도 / 창·곤 / 권·부)**로 나누고, 정·사·마는 계열 자원을
+다루는 **동사**로 둡니다. 세력은 고정하지 않고(출신 · 만남 · 잡캐), 성향 ×
+무공 구성으로 엔딩이 갈립니다. 저장이 있다고 가정합니다.
+
+그래서 "시작 선택 = 네 문파"를 전제로 쓴 부분을 정리했습니다(머리에 ↪ · ⚠️).
+
+| 노트 | 무엇을 더 안 쓰나 | 남는 것 |
+| --- | --- | --- |
+| [006](006-color-factions.md) | 5~7색 확장 · 상생상극 | 오방색 자료 → 017-7 색 |
+| [009](009-jianghu-chronicle.md) | "문파의 제자" 전제 | 기록 기준 · 원수 · 톤 |
+| [010](010-tianma-arc.md) | 10-2 · 10-3 (문파 해금 충돌 · 네 문파 동기) | 로스터 · n대 천마 · 보스 교체 |
+| [011](011-weapons-slots.md) | "무기는 색이 아니다"의 논거 · 무색 카드 | 졸업한 부분 · 이기어검 보류 |
+| [013](013-tianma-ending.md) | 13-1 결말 분기 (→ 017-6) | 덱을 보스로 바꾸는 규칙 |
+| [014](014-weapon-mastery.md) | **전체** — 무기 성장 축 | 원칙 둘 |
+| [016](016-four-acts.md) | 016-4 카드 구성 · 막마다 티어 | 막 구조 · 성향 · 30스테이지 |
+
+### 그 전 (2026-09-07 ~ 09-13)
 
 [012 갈림길](012-node-map.md) → [gdd/13](../gdd/13-crossroads.md),
 [011 무기](011-weapons-slots.md) → [gdd/14](../gdd/14-weapons.md)로
@@ -66,17 +86,17 @@
 | --- | --- | --- |
 | [002-murim-theme.md](002-murim-theme.md) | ✅ 채택 | 용어 정본 → [gdd/12](../gdd/12-murim-terms.md). 무협 자료 모음은 여기 유지 |
 | [007-ip-safety.md](007-ip-safety.md) | ✅ 채택 | 이름 원칙 → [gdd/12-6](../gdd/12-murim-terms.md). 개별 판정 근거는 여기 유지 |
-| [006-color-factions.md](006-color-factions.md) | 🔶 부분 채택 | 4색 배정(적·흑·백·자) → [gdd/03](../gdd/03-color-archetypes.md). **5~7색 확장은 보류** |
+| [006-color-factions.md](006-color-factions.md) | 🔶 부분 채택 | 4색 배정(적·흑·백·자) → [gdd/03](../gdd/03-color-archetypes.md). **5~7색 확장은 017이 대체**(오방색 자료는 017-7에서 다시 씀) |
 | [003-hap-exchange-memory.md](003-hap-exchange-memory.md) | 🔶 부분 채택 | `적max`·클로저 성격 → [gdd/02](../gdd/02-boss-intent-thresholds.md)·[08](../gdd/08-boss-skill-loop.md)·[10](../gdd/10-enemy-roster.md). **가변 `아max`·오버 파훼·허초는 보류** |
 | [005-sequence-conjured-cards.md](005-sequence-conjured-cards.md) | ⏸ 보류 | 새 시스템. 현재 4색 출구를 다듬는 게 먼저 |
 | [004-hidden-card-unlocks.md](004-hidden-card-unlocks.md) | ⏸ 보류 | 런 간 메타 진행. 한 런의 재미가 먼저 |
 | [008-ascension-goal.md](008-ascension-goal.md) | ⏸ 보류 | 런의 목표 = 등선(登仙). 클리어할수록 높아지는 난이도 사다리. 004와 한 쌍 |
-| [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **기록 재료는 [gdd/13-6](../gdd/13-crossroads.md)이 이미 쌓고 있음** |
-| [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리 |
-| [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **슬롯 2칸은 접음(한 자루) · 심검 제거 · 이기어검 보류** |
+| [009-jianghu-chronicle.md](009-jianghu-chronicle.md) | ⏸ 보류 | 런마다 한 줄씩 쌓이는 강호 연대기. **기록 재료는 [gdd/13-6](../gdd/13-crossroads.md)이 이미 쌓고 있음**. "문파의 제자" → 무명 강호인(017) |
+| [010-tianma-arc.md](010-tianma-arc.md) | ⏸ 보류 | 폭주한 천마를 막는 강호행. 로스터·색을 안 바꾸고 이름만 붙이는 최소 줄거리. **10-2·10-3은 017로 전제 사라짐** |
+| [011-weapons-slots.md](011-weapons-slots.md) | 🔶 부분 채택 | 규칙 수정자 · 런 중 교체 → [gdd/14](../gdd/14-weapons.md). **슬롯 2칸은 접음(한 자루) · 심검 제거 · 이기어검 보류 · "무기는 색이 아니다"는 017이 뒤집음** |
 | [012-node-map.md](012-node-map.md) | ✅ 채택 | 갈림길 → [gdd/13](../gdd/13-crossroads.md). **비무를 건너뛰는 안은 채택 안 함** |
-| [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. 009·010·012를 하나로 묶음 |
-| [014-weapon-mastery.md](014-weapon-mastery.md) | ⏸ 보류 | 무기를 계속 쥐면 세 번 자란다 — 기 · 강 · 의. **무기 축을 세 배로 부풀려 지금은 접음** |
+| [013-tianma-ending.md](013-tianma-ending.md) | ⏸ 보류 | 마공에 잠긴 채 끝내면 내 캐릭터가 다음 런의 천마로 돌아온다. **결말 분기는 017-6으로 흡수**, 덱→보스 변환 규칙만 남음 |
+| [014-weapon-mastery.md](014-weapon-mastery.md) | ↪ 대체 | 무기를 계속 쥐면 세 번 자란다 — 기 · 강 · 의. **017에서 무기가 캐릭터가 되며 필요 없어짐**. 원칙 둘만 남김 |
 | [001-artifact-system.md](001-artifact-system.md) | ✅ 채택 | 유물 → [gdd/15](../gdd/15-relics.md). **판정선 이동 계열은 검증 후 접음** |
 | [015-barehanded.md](015-barehanded.md) | ✅ 결정 | 맨손 삭제 → 여섯째 병기 권갑(방어도 없이 넘기면 다음 합 첫 공격 +3, [gdd/14-3](../gdd/14-weapons.md)) |
 | [016-four-acts.md](016-four-acts.md) | 🌱 씨앗 | 네 막 · 30스테이지(8·8·8·6) · 협객/악귀 성향. **카드 구성(016-4)은 017이 대체** |
