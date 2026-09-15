@@ -376,6 +376,7 @@ window.TS_Sim = (() => {
     // 검증 지표 — 전투가 끝날 때 한 번씩 모은다
     const lin = { battles: 0, turns: 0, carried: 0, carryTurns: 0, shareSum: 0, shareN: 0,
       minHpSum: 0, finale: 0, saber: 0, ultOffers: 0, ultFull: 0, midCounts: [],
+      ultBattles: 0, ultFullBattles: 0,
       deckOrth: 0, deckDem: 0, deckLineage: 0, deckSize: 0 };
     const seenGames = new WeakSet();
     const recordBattle = (g) => {
@@ -389,6 +390,10 @@ window.TS_Sim = (() => {
       lin.minHpSum += Math.max(0, s2.minHp) / g.playerMaxHp;
       lin.finale += s2.finaleFires;
       lin.saber += g.log.filter((l) => l.includes('도(刀) — 첫 초식')).length;
+      // 궁극기는 전투를 시작할 때마다 완전 조건을 본다 — 받은 뒤의 전투 중
+      // 몇 번을 완전한 채로 싸웠는지가 조건 N의 실제 무게다 (검증 4)
+      const ult = [...g.drawPile, ...g.hand, ...g.discardPile].find((c) => c.ultimate);
+      if (ult) { lin.ultBattles++; if (ult.isFull) lin.ultFullBattles++; }
     };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
@@ -514,6 +519,7 @@ window.TS_Sim = (() => {
         덱_장수: +(lin.deckSize / runs).toFixed(1),
         궁극기_받음: lin.ultOffers,
         궁극기_완전: lin.ultFull,
+        궁극기_완전전투: `${lin.ultFullBattles}/${lin.ultBattles}`,
         중간_세력수: lin.midCounts,
       } : undefined,
     };

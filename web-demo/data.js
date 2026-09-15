@@ -868,16 +868,22 @@ TS_DATA.GLOSSARY = [
       ].map(tag('orthodox')),
       // 마교 — 태운다. HP를 내고 이을 수를 미리 채우며, 흡성으로 되찾는다 (017-3).
       // chainPrime N: 지금 합의 연계를 N수 미리 채운다 (그 합에서 끝난다).
+      //
+      // 흡성은 처음 값의 0.6배, HP 소모는 +2다. 처음 값에서는 흡성이 소모를 넘게
+      // 되메워, 순수 마교가 순수 정파보다 클리어 72% 대 45%로 앞서고 최저 HP도
+      // 더 높았다(59% 대 54%). 이 값에서 53% 대 45%, 도달 9.4 대 9.3.
+      // ⚠️ 최저 HP는 어느 값에서도 정파보다 안 내려갔다(흡성 ×0.45 · HP +2까지
+      // 56~59%) — 마교가 빨리 끝내 덜 맞는 몫이 태우는 몫보다 크다. 017에 남긴다.
       demonic: [
-        { key: 'dem_blood_seal', name: '혈인연수', cost: 1, damage: 4, block: 0, hpCost: 3, chainPrime: 2, rarity: 1 },
-        { key: 'dem_drain_blade', name: '흡정검결', cost: 1, damage: 5, block: 0, chain: 2, lifesteal: 35, rarity: 1 },
-        { key: 'dem_reverse_vein', name: '혈맥역류', cost: 1, damage: 0, block: 0, hpCost: 4, chainPrime: 3, rarity: 1 },
-        { key: 'dem_soul_cut', name: '탈혼일참', cost: 2, damage: 8, block: 0, chain: 4, hpCost: 2, rarity: 1 },
-        { key: 'dem_blood_chain', name: '혈류연환', cost: 2, damage: 6, block: 0, chain: 5, lifesteal: 30, rarity: 2 },
+        { key: 'dem_blood_seal', name: '혈인연수', cost: 1, damage: 4, block: 0, hpCost: 5, chainPrime: 2, rarity: 1 },
+        { key: 'dem_drain_blade', name: '흡정검결', cost: 1, damage: 5, block: 0, chain: 2, lifesteal: 21, rarity: 1 },
+        { key: 'dem_reverse_vein', name: '혈맥역류', cost: 1, damage: 0, block: 0, hpCost: 6, chainPrime: 3, rarity: 1 },
+        { key: 'dem_soul_cut', name: '탈혼일참', cost: 2, damage: 8, block: 0, chain: 4, hpCost: 4, rarity: 1 },
+        { key: 'dem_blood_chain', name: '혈류연환', cost: 2, damage: 6, block: 0, chain: 5, lifesteal: 18, rarity: 2 },
         { key: 'dem_mad_chain', name: '광혈연격', cost: 2, damage: 4, block: 0, chain: 3, rageScale: 2, rarity: 2 },
-        { key: 'dem_soul_palm', name: '흡혼장법', cost: 2, damage: 9, block: 0, lifesteal: 50, rarity: 2 },
-        { key: 'dem_blood_sea', name: '혈해분천', cost: 3, damage: 10, block: 0, chain: 6, hpCost: 8, chainPrime: 5, rarity: 3 },
-        { key: 'dem_devil_drain', name: '마검흡혈', cost: 3, damage: 12, block: 0, chain: 7, lifesteal: 35, rarity: 3 },
+        { key: 'dem_soul_palm', name: '흡혼장법', cost: 2, damage: 9, block: 0, lifesteal: 30, rarity: 2 },
+        { key: 'dem_blood_sea', name: '혈해분천', cost: 3, damage: 10, block: 0, chain: 6, hpCost: 10, chainPrime: 5, rarity: 3 },
+        { key: 'dem_devil_drain', name: '마검흡혈', cost: 3, damage: 12, block: 0, chain: 7, lifesteal: 21, rarity: 3 },
       ].map(tag('demonic')),
     },
   };
@@ -896,9 +902,9 @@ TS_DATA.GLOSSARY = [
         full: { chain: 12, block: 12, chainKeep: 5 },
       },
       demonic: {
-        key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, block: 0, chain: 10, hpCost: 6, chainPrime: 4,
+        key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, block: 0, chain: 10, hpCost: 8, chainPrime: 4,
         faction: 'demonic', ultimate: true, unique: true, fullAt: 5,
-        full: { chain: 14, lifesteal: 50 },
+        full: { chain: 14, lifesteal: 30 },
       },
     },
   };
