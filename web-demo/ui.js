@@ -9,6 +9,7 @@ const TS_UI = (() => {
   function cacheEls() {
     [
       'screen-select', 'screen-battle', 'screen-reward', 'screen-result',
+      'screen-origin', 'origin-sub', 'origin-grid',
       'deck-grid', 'stage-badge', 'stage-name', 'turn-count', 'restart-btn',
       'player-avatar', 'player-name', 'player-hp-fill', 'player-hp-text', 'player-badges', 'player-fx',
       'enemy-avatar', 'enemy-name', 'boss-hp-fill', 'boss-hp-text', 'boss-badges', 'enemy-fx',
@@ -29,14 +30,16 @@ const TS_UI = (() => {
 
   // ── 화면 전환 ───────────────────────────────────────────────
   function showScreen(name) {
-    ['select', 'weapon', 'battle', 'reward', 'crossroad', 'node', 'result'].forEach((s) => {
-      els[`screen-${s}`].classList.toggle('hidden', s !== name);
+    ['select', 'origin', 'weapon', 'battle', 'reward', 'crossroad', 'node', 'result'].forEach((s) => {
+      const el = els[`screen-${s}`];
+      if (el) el.classList.toggle('hidden', s !== name);
     });
   }
 
   function render() {
     const run = TS_Run.get();
     if (run.phase === 'SELECT') { showScreen('select'); renderDeckSelect(); return; }
+    if (run.phase === 'ORIGIN') { showScreen('origin'); renderOrigin(run); return; }
     if (run.phase === 'WEAPON') { showScreen('weapon'); renderWeaponSelect(run); return; }
     if (run.phase === 'BATTLE') { showScreen('battle'); renderBattle(run); return; }
     if (run.phase === 'REWARD') { showScreen('reward'); renderReward(run); return; }
@@ -58,14 +61,16 @@ const TS_UI = (() => {
     const FIELDS = [
       { key: 'hpCost', label: 'HP 소모', text: (v) => `HP ${v} 소모` },
       { key: 'damage', label: '피해', text: (v) => `피해 ${v}` },
-      { key: 'chain', label: '연계 피해', text: (v) => `이번 합에 쓴 초식 1장당 피해 +${v}` },
+      { key: 'chainPrime', label: '연계 채움', text: (v) => `이을 수를 미리 ${v}수 채움` },
+      { key: 'chain', label: '연계 피해', text: (v) => `이번 합에 이은 초식 1장당 피해 +${v}` },
     { key: 'deepStrike', label: '일격', text: (v) => `남은 버퍼 1칸당 피해 +${v}` },
     { key: 'rageScale', label: '광기', text: (v) => `잃은 체력 10당 피해 +${v}` },
       { key: 'discardAll', label: '파기 피해', text: (v) => `손패를 전부 파기하고 파기 1장당 피해 +${v}` },
       { key: 'blockToDamage', label: '방어도 환산', text: (v) => (v === 1 ? '현재 방어도만큼 피해 추가' : `현재 방어도 ${v}배만큼 피해 추가`) },
       { key: 'lifesteal', label: '흡혈', text: (v) => `입힌 피해의 ${v}% 회복` },
       { key: 'block', label: '방어도', text: (v) => `방어도 ${v}` },
-      { key: 'chainBlock', label: '연계 방어도', text: (v) => `이번 합에 쓴 초식 1장당 방어도 +${v}` },
+      { key: 'chainBlock', label: '연계 방어도', text: (v) => `이번 합에 이은 초식 1장당 방어도 +${v}` },
+      { key: 'chainKeep', label: '연계 쌓기', text: (v) => `이은 수 중 ${v}수를 다음 합으로 넘김` },
       { key: 'heal', label: '회복', text: (v) => `체력 ${v} 회복` },
       { key: 'draw', label: '드로우', text: (v) => `카드 ${v}장 드로우` },
       { key: 'rewind', label: '되감기', text: (v) => `기세 ${v} 되감기` },
@@ -143,6 +148,48 @@ const TS_UI = (() => {
       });
       els['deck-grid'].appendChild(div);
     });
+
+    // 파일럿 — 무기 계열 (ideanote/017). 4문파와 섞이지 않게 줄을 따로 긋는다.
+    if (D.LINEAGES_ENABLED && D.LINEAGES) {
+      const head = document.createElement('div');
+      head.className = 'pilot-heading';
+      head.innerHTML = '<b>파일럿 — 무기 계열</b>'
+        + '<span>문파 대신 무기로 나서고, 세력은 전리품으로 정합니다. 검증 중이라 수치가 바뀝니다.</span>';
+      els['deck-grid'].appendChild(head);
+      Object.entries(D.LINEAGES).forEach(([key, info]) => {
+        const list = (D.LINEAGE_STARTER[key] || []).map((c) => `${c.name}×${c.count || 1}`).join(' · ');
+        const div = document.createElement('div');
+        div.className = `deck-card ${key} pilot`;
+        div.innerHTML = `
+          <div class="deck-icon">${info.icon}</div>
+          <div class="deck-name">${info.name} <span class="deck-color">${info.sect}</span></div>
+          <div class="deck-desc">${info.desc}</div>
+          <div class="deck-list">${list}</div>`;
+        div.addEventListener('click', () => { TS_Run.chooseDeck(key); resetBattleFx(); render(); });
+        els['deck-grid'].appendChild(div);
+      });
+    }
+  }
+
+  // ── 출신 (파일럿, ideanote/017-5) ──────────────────────────
+  function renderOrigin(run) {
+    const p = TS_Run.profile(run.color);
+    if (els['origin-sub']) {
+      els['origin-sub'].textContent = `${p.sect} · ${p.name} — 이번 판을 어떻게 시작할지 고릅니다. 세력은 정해지지 않습니다.`;
+    }
+    const grid = els['origin-grid'];
+    if (!grid) return;
+    grid.innerHTML = '';
+    (D.ORIGINS || []).forEach((o) => {
+      const div = document.createElement('div');
+      div.className = 'weapon-card origin-card' + (o.faction ? ` fac-${o.faction}` : '');
+      div.innerHTML = `
+        <div class="wc-icon">${o.icon}</div>
+        <div class="wc-name">${o.name}</div>
+        <div class="wc-rule">${o.desc}</div>`;
+      div.addEventListener('click', () => { TS_Run.chooseOrigin(o.key); render(); });
+      grid.appendChild(div);
+    });
   }
 
   // ── 전투 ────────────────────────────────────────────────────
@@ -178,7 +225,7 @@ const TS_UI = (() => {
 
   function renderBattle(run) {
     const g = run.game;
-    const color = D.COLORS[run.color];
+    const color = TS_Run.profile(run.color);
 
     els['stage-badge'].textContent = run.battleKind === 'ELITE'
       ? '비무대회' : `STAGE ${run.stage}`;
@@ -214,6 +261,8 @@ const TS_UI = (() => {
     addBadge(els['player-badges'], 'vulnerable', '사혈 노출(다음 피격 +50%)', g.playerVulnerableActive);
     addBadge(els['player-badges'], 'power', `반탄 ${g.counterDamage}`, g.counterDamage > 0);
     addBadge(els['player-badges'], 'block', `흘리기 ${g.evadeCharges}회`, g.evadeCharges > 0);
+    addBadge(els['player-badges'], 'power', `이어 온 연계 ${g.chainBank}수`, g.chainBank > 0);
+    addBadge(els['player-badges'], 'block', `다음 합에 연계 ${Math.min(TS_Engine.chainLinks(g), g.chainKeepThisTurn)}수 남김`, g.chainKeepThisTurn > 0);
     addBadge(els['player-badges'], 'power', `다음 초식의 틈 -${g.pendingCostReduction}`, g.pendingCostReduction > 0);
     addBadge(els['player-badges'], 'power', `다음 공격 ${g.pendingDamageMultiplier}배`, g.pendingDamageMultiplier > 1);
     addBadge(els['player-badges'], 'stun', `파훼 임계점 ${g.breakThreshold}`, g.breakThreshold !== g.baseBreakThreshold);
@@ -384,7 +433,8 @@ const TS_UI = (() => {
     els['hand-row'].innerHTML = '';
     g.hand.forEach((card) => {
       const div = document.createElement('div');
-      div.className = `card ${run.color}` + (card.upgraded ? ' upgraded' : '');
+      div.className = `card ${run.color}` + (card.upgraded ? ' upgraded' : '')
+        + (card.faction ? ` f-${card.faction}` : '') + (card.isFull ? ' full' : '');
       div.draggable = true;
       div.dataset.uid = card.uid;
       const hpTag = card.hpCost ? `<span style="color:var(--danger)">HP -${card.hpCost}</span> · ` : '';
@@ -632,11 +682,11 @@ const TS_UI = (() => {
   // 무기는 수치가 아니라 규칙을 비튼다. 그래서 카드처럼 "피해 N"을 보여줄
   // 게 없고, 규칙 문장 자체가 곧 카드 설명이다.
   function renderWeaponSelect(run) {
-    const color = D.COLORS[run.color] || {};
+    const color = TS_Run.profile(run.color);
     els['weapon-sub'].textContent =
       `${color.sect} · ${color.name} — 병기는 한 자루만 쥡니다. 런 중에 바꾸려면 쥔 것을 놓습니다.`;
     els['weapon-grid'].innerHTML = '';
-    Object.values(D.WEAPONS).forEach((w) => {
+    TS_Run.weaponKeysFor(run.color).map((k) => D.WEAPONS[k]).forEach((w) => {
       const div = document.createElement('div');
       div.className = 'weapon-card';
       div.innerHTML = `
@@ -680,27 +730,55 @@ const TS_UI = (() => {
   // 강화는 여기 없다 — 수련장 걸음으로 옮겼다 (gdd/13 13-3). 전리품과
   // 수련은 성격이 다른 보상인데 한 화면에서 다투게 두면, 둘 중 하나는
   // 늘 고르지 않는 쪽이 된다.
+  // 파일럿 카드의 이름표 — 희귀도 · 세력(동사) · 계열. 4문파 카드에는 없다.
+  const RARITY_NAME = { 1: '일반', 2: '고급', 3: '희귀' };
+  function cardTagsHtml(c) {
+    const tags = [];
+    if (c.ultimate) tags.push('<span class="rar-chip rar-ult">궁극기</span>');
+    else if (c.rarity) tags.push(`<span class="rar-chip rar-${c.rarity}">${RARITY_NAME[c.rarity]}</span>`);
+    const f = c.faction && D.FACTIONS && D.FACTIONS[c.faction];
+    if (f) tags.push(`<span class="fac-chip fac-${c.faction}">${f.name} · ${f.verb}</span>`);
+    else if (c.lineage) tags.push('<span class="fac-chip fac-lineage">계열</span>');
+    return tags.length ? `<div class="rc-tags">${tags.join('')}</div>` : '';
+  }
+
+  // 궁극기는 받을 때 "완전해지는 조건"과 지금 몇 장인지를 보여야 한다 —
+  // 조건을 모른 채 받으면 받은 뒤의 선택(세력을 더 모을까)이 안 읽힌다.
+  function ultimateHtml(c) {
+    if (!c.ultimate || !c.full) return '';
+    const need = c.fullAt || D.ULTIMATE_FULL_AT;
+    const have = TS_Run.factionCount(c.faction);
+    const f = (D.FACTIONS || {})[c.faction] || {};
+    return `<div class="rc-ult">덱에 ${f.name} 초식 ${need}장 이상이면 완전해집니다 — 지금 ${have}장${have >= need ? ' ✓' : ''}`
+      + `<br>완전: ${TS_Text.describe({ ...c, ...c.full })}</div>`;
+  }
+
   function renderReward(run) {
     const elite = run.battleKind === 'ELITE';
-    els['reward-title'].textContent = elite
-      ? '비무대회 우승!'
-      : `스테이지 ${run.stage} 클리어!`;
+    const ultimate = run.rewardOptions.some((o) => o.ultimate);
+    els['reward-title'].textContent = run.preRun
+      ? '강호 경험 — 나서기 전에'
+      : elite ? '비무대회 우승!' : `스테이지 ${run.stage} 클리어!`;
     const next = D.ENEMIES[run.stage] ? D.ENEMIES[run.stage].name : '—';
     els['reward-sub'].textContent =
       `현재 덱 ${run.deck.length}장 · 체력 ${run.playerHp}/${run.playerMaxHp} · 다음 상대: ${next}`;
-    els['reward-heading'].textContent = run.rewardPicksLeft > 1
-      ? `전리품 — 초식 ${run.rewardPicksLeft}장을 거둡니다`
-      : '전리품 — 초식 하나를 거둡니다';
+    els['reward-heading'].textContent = ultimate
+      ? '궁극기 — 강호행에 하나만 거둡니다'
+      : run.rewardPicksLeft > 1
+        ? `전리품 — 초식 ${run.rewardPicksLeft}장을 거둡니다`
+        : '전리품 — 초식 하나를 거둡니다';
     decorateTerms(els['reward-sub']);
 
     els['reward-grid'].innerHTML = '';
     run.rewardOptions.forEach((opt) => {
       const div = document.createElement('div');
-      div.className = 'reward-card';
+      div.className = 'reward-card' + (opt.ultimate ? ' rar-ult' : opt.rarity ? ` rar-${opt.rarity}` : '');
       div.innerHTML = `
+        ${cardTagsHtml(opt)}
         <div class="rc-name">${opt.name}</div>
         <div class="rc-cost">틈 ${opt.cost}</div>
-        <div class="rc-desc">${TS_Text.describe(opt)}</div>`;
+        <div class="rc-desc">${TS_Text.describe(opt)}</div>
+        ${ultimateHtml(opt)}`;
       div.addEventListener('click', () => { TS_Run.takeCard(opt); resetBattleFx(); render(); });
       els['reward-grid'].appendChild(div);
     });
@@ -1191,6 +1269,19 @@ const TS_UI = (() => {
   // 낡은 index.html에서도 기능이 죽지 않고 그대로 동작한다.
   function ensureChrome() {
     const app = document.getElementById('app') || document.body;
+
+    // 출신 화면 (파일럿) — index.html이 캐시돼 있어도 계열 런이 멈추지 않게
+    if (!$('screen-origin')) {
+      const sel = $('screen-select');
+      const sec = document.createElement('section');
+      sec.className = 'screen hidden';
+      sec.id = 'screen-origin';
+      sec.innerHTML = '<h2 class="title">출신(出身)</h2>'
+        + '<p class="subtitle" id="origin-sub"></p>'
+        + '<div class="weapon-grid" id="origin-grid"></div>';
+      if (sel && sel.parentElement) sel.parentElement.insertBefore(sec, sel.nextSibling);
+      else app.appendChild(sec);
+    }
 
     if (!$('rules-overlay')) {
       const ov = document.createElement('div');

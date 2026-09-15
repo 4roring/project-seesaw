@@ -508,6 +508,17 @@ const TS_DATA = {
       // 한 번도 안 터진다(0.00). +3에서 4색 × 300런 평균 5.05로 다섯과 붙는다.
       bareFist: 3,
     },
+    // 파일럿 (ideanote/017-2) — 검·도 계열의 검. 연계를 끝까지 이으면 보상한다
+    // (순방향). 도(刀)가 같은 연계를 역방향으로 읽으므로 계열 안 두 무기가
+    // 정면으로 맞선다. lineageOnly라 4문파 런의 선택지·제안에는 나오지 않는다.
+    // 4문파의 검(sword, 착지)은 건드리지 않는다 — 017은 착지를 창으로 옮기지만
+    // 그건 창·곤 파일럿(순서 2)의 일이다.
+    blade_sword: {
+      key: 'blade_sword', name: '검(劍)', icon: '🗡', lineageOnly: 'BLADE',
+      flavor: '끊기지 않는 검로가 곧 검의 격이다.',
+      rule: '한 합에 네 수 이상 이어(이어 온 연계 포함) 선을 넘기면 적에게 피해 6',
+      finaleLinks: 4, finaleDamage: 6,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────
@@ -624,7 +635,7 @@ const TS_DATA = {
       story: '무너진 서고에서 낡은 책자를 주웠습니다. 구결은 읽히나 몸이 따라주지 않습니다.',
       gain: '색 밖의 초식 한 자락 — 다만 구결뿐입니다',
       cost: '다음 수련장에서 한 걸음을 들여야 익혀집니다',
-      apply: (run) => { run.pendingManual = true; },
+      apply: (run) => { run.pendingManual = (run.pendingManual || 0) + 1; },
       available: (run) => !run.pendingManual,
     },
     {
@@ -648,10 +659,11 @@ const TS_DATA = {
       key: 'relic_blade', name: '신병이기(神兵利器)', icon: '🗡',
       story: '폐허가 된 대장간 한켠에 이름 없는 병기가 꽂혀 있습니다.',
       gain: '신병이기 한 자루',
-      cost: '손이 다 찼다면 쥐고 있던 것을 놓아야 합니다',
+      cost: '쥐고 있던 병기를 놓아야 합니다',
       apply: () => {},
+      // 계열 런이면 그 계열의 병기만 후보다 (ideanote/017-2)
       available: (run) => TS_DATA.WEAPONS_ENABLED
-        && Object.keys(TS_DATA.WEAPONS).some((k) => !run.weapons.includes(k)),
+        && TS_Run.weaponKeysFor(run.color).some((k) => !run.weapons.includes(k)),
     },
     {
       key: 'hermit', name: '은거 고수', icon: '🧙',
@@ -750,3 +762,175 @@ TS_DATA.GLOSSARY = [
   { term: '강호행', desc: '한 번의 도전. 스테이지 1~10을 지나면 끝난다.' },
   { term: '갈림길', desc: '비무와 비무 사이의 한 걸음. 수련장·주루·문파 방문 따위를 고른다.' },
 ];
+
+
+// ─────────────────────────────────────────────────────────────
+// 파일럿 — 무기 계열 (ideanote/017, 순서 1: 검·도 × 정파 / 마교)
+//
+// 지금 4문파 데모와 **나란히** 둔다. 합격 기준을 재기 전에는 gdd에 올리지
+// 않는다 (ideanote/00-README "노트 → 파일럿 → 졸업"). 여기 수치와 이름은
+// 데모 세션이 정한 첫 값이고, 검증 결과는 017 끝에 남긴다.
+// ─────────────────────────────────────────────────────────────
+(() => {
+  const D = TS_DATA;
+
+  // 계열 20장은 적(화산)의 연계 재료를 옮겨 쓴다 (017-2). 같은 key를 쓰면
+  // 강화표가 그대로 따라오고, 수치를 두 곳에 적지 않아도 된다.
+  // 일격(deepStrike)은 옮기지 않는다 — 버퍼 깊이는 창·곤의 "간격" 재료다.
+  const RED = [...D.STARTER_DECKS.RED, ...Object.values(D.REWARD_POOLS.RED).flat()];
+  const from = (key, rarity, patch) => {
+    const base = RED.find((c) => c.key === key);
+    if (!base) throw new Error(`파일럿 계열 카드의 원본이 없습니다: ${key}`);
+    const extra = typeof patch === 'function' ? patch(base) : (patch || {});
+    const c = { ...base, ...extra, rarity, lineage: 'BLADE' };
+    delete c.count;
+    return c;
+  };
+
+  D.LINEAGES_ENABLED = true;
+  D.LINEAGES = {
+    BLADE: {
+      key: 'BLADE', name: '검·도', sect: '무명의 강호인', icon: '⚔', pilot: true,
+      desc: '한 합에 이어 친 수를 모아 무거운 한 수로 마무리하는 계열. 세력은 정해지지 않는다',
+      weapons: ['blade_sword', 'saber'],
+    },
+  };
+
+  // 세력은 자원이 없고 동사만 있다 (017-1). 이름표와 동사만 둔다.
+  D.FACTIONS = {
+    orthodox: { key: 'orthodox', name: '정파', verb: '쌓는다', icon: '☯' },
+    demonic: { key: 'demonic', name: '마교', verb: '태운다', icon: '血' },
+  };
+
+  // 시작 덱 10장 — 기본 타격·방어 + 계열 고유 2장 (017-4). 150장에 세지 않는다.
+  //
+  // 고유 2장은 연계의 마무리(매화만개)와 무거운 한 수(파옥일섬). 처음에는
+  // 연환매화·기수응세(값싼 연계 둘)를 넣었더니 탐욕 정책 300런 중 200런이
+  // 1스테이지에서 죽었다(도달 2.6) — 기본 8장으로는 90 체력을 못 깎는다.
+  //
+  //   시작 덱 (300런)                       초심자  탐욕
+  //   타5×4 · 방6×4 · 연환매화 · 기수응세     2.5    2.6
+  //   타5×4 · 방6×4 · 매화만개 · 파옥일섬     3.7    8.8
+  //   타6×4 · 방6×4 · 매화만개 · 파옥일섬     4.2    8.6   ← 지금
+  //   타7×4 · 방7×4 · 매화만개 · 연환매화     3.3    9.5
+  //   (참고) 적(화산) 시작 덱 그대로          5.7    9.8
+  //   (기준) 4문파 적(화산)                   5.0    9.7
+  //
+  // 초심자가 4문파보다 0.8 낮은 것은 모양 탓이다 — 적의 시작 덱은 기본이 아닌
+  // 초식이 다섯 장인데 017-4의 모양은 두 장이다. 수치로 메우지 않고 017에 남긴다.
+  const red = (key, count) => ({ ...RED.find((c) => c.key === key), count });
+  D.LINEAGE_STARTER = {
+    BLADE: [
+      { key: 'blade_strike', name: '기본검세', cost: 1, damage: 6, block: 0, count: 4 },
+      { key: 'blade_guard', name: '기본방세', cost: 1, damage: 0, block: 6, count: 4 },
+      red('chain_burst', 1),
+      red('breakthrough', 1),
+    ],
+  };
+
+  // 계열 고유 20장 — 일반 9 · 고급 8 · 희귀 3 (017-4)
+  D.LINEAGE_POOL = {
+    BLADE: [
+      from('rapid_slash', 1), from('chain_wall', 1), from('counter_rage', 1),
+      from('flame_edge', 1), from('ignite', 1), from('double_load', 1),
+      from('breakthrough', 1), from('focus', 1), from('heat_vent', 1),
+
+      from('chain_burst', 2), from('chain_storm', 2), from('flame_combo', 2),
+      from('option_crackshot', 2), from('option_warmup', 2), from('blaze_dance', 2),
+      from('heat_armor', 2),
+      // '폭혈운기'는 마교의 피 이미지라 계열 공용 이름으로 바꿔 쓴다
+      from('tamer_overdrive', 2, (b) => ({
+        name: '심법: 검기운용',
+        persistentPayload: { ...b.persistentPayload, name: '검기운용' },
+      })),
+
+      from('final_chain', 3), from('chain_finale', 3), from('decisive', 3),
+    ],
+  };
+
+  // 세력 하이브리드 — "(계열 자원)을 (세력 동사)한다" (017-1). 세력마다 일반 4 ·
+  // 고급 3 · 희귀 2, 그리고 궁극기 1은 따로 (017-4).
+  const tag = (faction) => (c) => ({ ...c, faction });
+  D.FACTION_POOL = {
+    BLADE: {
+      // 정파 — 쌓는다. 이은 수가 합을 넘어 남고, 방어와 함께 간다 (017-3).
+      // chainKeep N: 이번 합에 이은 수 중 N수까지 다음 합으로 넘긴다.
+      orthodox: [
+        { key: 'orth_heart_blade', name: '정심일검', cost: 1, damage: 4, block: 3, chainKeep: 1, rarity: 1 },
+        { key: 'orth_guard_seal', name: '호체수결', cost: 1, damage: 0, block: 6, chainKeep: 1, rarity: 1 },
+        { key: 'orth_blue_cloud', name: '청운연수', cost: 1, damage: 3, block: 0, chain: 3, chainKeep: 1, rarity: 1 },
+        { key: 'orth_flow_palm', name: '여수장법', cost: 2, damage: 7, block: 4, chainKeep: 2, rarity: 1 },
+        { key: 'orth_true_link', name: '정종연검', cost: 2, damage: 5, block: 3, chain: 5, rarity: 2 },
+        { key: 'orth_head_tail', name: '수미상응', cost: 2, damage: 0, block: 9, chainBlock: 2, chainKeep: 2, rarity: 2 },
+        { key: 'orth_cloud_dragon', name: '운룡이음', cost: 1, damage: 2, block: 0, chain: 4, chainKeep: 2, rarity: 2 },
+        { key: 'orth_great_river', name: '대하장강', cost: 3, damage: 9, block: 0, chain: 7, chainKeep: 3, rarity: 3 },
+        { key: 'orth_mountain_qi', name: '태산정기', cost: 3, damage: 0, block: 12, chainBlock: 4, chainKeep: 3, rarity: 3 },
+      ].map(tag('orthodox')),
+      // 마교 — 태운다. HP를 내고 이을 수를 미리 채우며, 흡성으로 되찾는다 (017-3).
+      // chainPrime N: 지금 합의 연계를 N수 미리 채운다 (그 합에서 끝난다).
+      demonic: [
+        { key: 'dem_blood_seal', name: '혈인연수', cost: 1, damage: 4, block: 0, hpCost: 3, chainPrime: 2, rarity: 1 },
+        { key: 'dem_drain_blade', name: '흡정검결', cost: 1, damage: 5, block: 0, chain: 2, lifesteal: 35, rarity: 1 },
+        { key: 'dem_reverse_vein', name: '혈맥역류', cost: 1, damage: 0, block: 0, hpCost: 4, chainPrime: 3, rarity: 1 },
+        { key: 'dem_soul_cut', name: '탈혼일참', cost: 2, damage: 8, block: 0, chain: 4, hpCost: 2, rarity: 1 },
+        { key: 'dem_blood_chain', name: '혈류연환', cost: 2, damage: 6, block: 0, chain: 5, lifesteal: 30, rarity: 2 },
+        { key: 'dem_mad_chain', name: '광혈연격', cost: 2, damage: 4, block: 0, chain: 3, rageScale: 2, rarity: 2 },
+        { key: 'dem_soul_palm', name: '흡혼장법', cost: 2, damage: 9, block: 0, lifesteal: 50, rarity: 2 },
+        { key: 'dem_blood_sea', name: '혈해분천', cost: 3, damage: 10, block: 0, chain: 6, hpCost: 8, chainPrime: 5, rarity: 3 },
+        { key: 'dem_devil_drain', name: '마검흡혈', cost: 3, damage: 12, block: 0, chain: 7, lifesteal: 35, rarity: 3 },
+      ].map(tag('demonic')),
+    },
+  };
+
+  // 궁극기 — 계열 3 × 세력 3 = 9장 중 파일럿 2장 (017-5).
+  // 016은 "2막 보스(16/30스테이지)"에 줬다. 10스테이지 데모에서는 같은 자리인
+  // 5스테이지 클리어 전리품을 궁극기로 바꾼다. 런에 하나(unique).
+  // 덱에 그 세력 초식이 fullAt장 이상이면 full 값으로 싸운다 (전투를 시작할 때 판정).
+  D.ULTIMATE_STAGE = 5;
+  D.ULTIMATE_FULL_AT = 5;
+  D.ULTIMATES = {
+    BLADE: {
+      orthodox: {
+        key: 'orth_ultimate', name: '정기만리', cost: 4, damage: 12, block: 8, chain: 8, chainKeep: 3,
+        faction: 'orthodox', ultimate: true, unique: true, fullAt: 5,
+        full: { chain: 12, block: 12, chainKeep: 5 },
+      },
+      demonic: {
+        key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, block: 0, chain: 10, hpCost: 6, chainPrime: 4,
+        faction: 'demonic', ultimate: true, unique: true, fullAt: 5,
+        full: { chain: 14, lifesteal: 50 },
+      },
+    },
+  };
+
+  // 출신 — 시작 유물 하나, 유물 세 칸 밖 (017-5). 선대의 유산은 저장과 함께(순서 6).
+  D.ORIGIN_FACTION_WEIGHT = 2;
+  D.ORIGINS = [
+    { key: 'orth_disciple', name: '정파 속가제자', icon: '🏯', faction: 'orthodox',
+      desc: '정파 무공이 전리품에 두 배로 자주 보입니다.' },
+    { key: 'demon_remnant', name: '마교 잔당', icon: '🩸', faction: 'demonic',
+      desc: '마교 무공이 전리품에 두 배로 자주 보입니다.' },
+    { key: 'veteran', name: '강호 경험', icon: '🎒', veteran: true,
+      desc: '나서기 전에 전리품을 한 번 고릅니다 (3장 중 1장).' },
+    { key: 'two_manuals', name: '비급 두 권', icon: '📜', manuals: 2,
+      desc: '구결 두 권을 들고 나섭니다. 수련장에서 한 걸음씩 들여야 익혀집니다.' },
+    // 017은 "영약"이라 불렀지만 기연 영약(대가 있음)과 이름이 겹친다 — 017이
+    // "이름은 나중에 가린다"고 남겼으므로 데모에서 가린다.
+    { key: 'life_pill', name: '보명단', icon: '💊', maxHp: 10,
+      desc: '최대 체력 +10. 적의 큰 초식 한 대만큼 여유가 생깁니다.' },
+  ];
+
+  // 희귀도 확률 — 슬더스 값에서 출발 (017-4). 계열 런은 막으로 풀을 막지 않는다.
+  D.RARITY_ODDS = { STAGE: [60, 37, 3], ELITE: [50, 40, 10], BOSS: [0, 0, 100] };
+
+  Object.assign(D.UPGRADES, {
+    blade_strike: { damage: 8 }, blade_guard: { block: 9 },
+    orth_heart_blade: { damage: 6, block: 4 }, orth_guard_seal: { block: 9 },
+    orth_blue_cloud: { chain: 5 }, orth_flow_palm: { damage: 10 },
+    orth_true_link: { chain: 7 }, orth_head_tail: { block: 12 }, orth_cloud_dragon: { chain: 6 },
+    orth_great_river: { chain: 9 }, orth_mountain_qi: { block: 16 },
+    dem_blood_seal: { chainPrime: 3 }, dem_drain_blade: { damage: 7 }, dem_reverse_vein: { chainPrime: 4 },
+    dem_soul_cut: { chain: 6 }, dem_blood_chain: { chain: 7 }, dem_mad_chain: { rageScale: 3 },
+    dem_soul_palm: { damage: 12 }, dem_blood_sea: { chain: 8 }, dem_devil_drain: { chain: 9 },
+  });
+})();

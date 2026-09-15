@@ -68,6 +68,10 @@ const TS_Engine = (() => {
       breakCount: 0,     // 오도비 — 런이 전투 후에 읽어 간다
       returnBonusNextTurn: 0, // 곤(棍) — 방어도를 남기면 다음 합이 깊어진다
       bareFistNextTurn: 0,    // 권갑(拳甲) — 막지 않고 넘기면 다음 합 첫 공격이 무겁다
+      // 파일럿 — 무기 계열 (ideanote/017-3). 4문파 런에서는 셋 다 늘 0이다.
+      chainBank: 0,          // 이번 합의 연계 수에 더해지는 연계 (이어 온 것 + 미리 채운 것)
+      chainBankNext: 0,      // 합이 끝날 때 정해져 다음 합으로 넘어가는 연계
+      chainKeepThisTurn: 0,  // 이번 합에 '쌓는다' 초식이 남기기로 한 연계의 상한
       // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
       // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
       minMomentumReturn: config.minReturn != null ? config.minReturn : D.MIN_MOMENTUM_RETURN,
@@ -119,6 +123,12 @@ const TS_Engine = (() => {
     game.lastStandLeft = config.lastStandLeft != null
       ? config.lastStandLeft
       : game.relics.reduce((n, r) => n + (r.lastStand || 0), 0);
+    // 검증 지표 (ideanote/017 "검증하려면" 1). 규칙에는 쓰지 않는다 — 세력이
+    // 운영을 바꾸는지 보려면 도달만으로는 부족하다.
+    game.stats = {
+      turnDamage: 0, maxTurnDamage: 0, totalDamage: 0, minHp: game.playerHp,
+      carriedLinks: 0, carryTurns: 0, finaleFires: 0,
+    };
     drawCards(game, D.HAND_SIZE);
     pushLog(game, `전투 시작 — ${enemy.name} (HP ${enemy.hp})`);
     return game;
@@ -171,9 +181,21 @@ const TS_Engine = (() => {
     game.cardsDiscardedThisTurn = 0;
     game.momentumSpentThisTurn = 0;
     game.thresholdDownThisTurn = 0;
+    // 연계 이월 (ideanote/017-3) — 미리 채운(마교) 연계는 그 합에서 끝나고,
+    // 쌓아 둔(정파) 것만 넘어온다.
+    game.chainBank = game.chainBankNext || 0;
+    game.chainBankNext = 0;
+    game.chainKeepThisTurn = 0;
+    if (game.stats) {
+      game.stats.maxTurnDamage = Math.max(game.stats.maxTurnDamage, game.stats.turnDamage);
+      game.stats.turnDamage = 0;
+      game.stats.carriedLinks += game.chainBank;
+      game.stats.carryTurns += 1;
+    }
     tickActiveEffects(game);
     drawCards(game, refillCount);
     pushLog(game, `--- ${game.turn}합 시작 (기세 ${gaugeLabel(game.gauge)}) ---`);
+    if (game.chainBank > 0) pushLog(game, `이어 온 연계 ${game.chainBank}수로 시작합니다.`);
   }
 
   function addOrRefreshEffect(game, { id, name, kind, amount, turns }) {
@@ -221,6 +243,11 @@ const TS_Engine = (() => {
     return game.weapons.reduce((sum, w) => sum + (w[field] || 0), 0);
   }
   function hasWeapon(game, field) { return game.weapons.some((w) => w[field]); }
+
+  // 연계 수 — 이번 합에 이은 초식 + 합을 넘어 이어 온 연계(정파 '쌓는다') +
+  // HP로 미리 채운 연계(마교 '태운다'). 4문파 런에서는 chainBank가 늘 0이라
+  // 예전 cardsPlayedThisTurn과 같은 값이다 (ideanote/017-3).
+  function chainLinks(game) { return game.cardsPlayedThisTurn + (game.chainBank || 0); }
 
   // 이번 합에 실제로 넘어야 하는 빈틈. 하한을 두는 이유는 gdd/02 2-3.
   function effectiveBreakThreshold(game) {
@@ -273,6 +300,10 @@ const TS_Engine = (() => {
     game.bossBlock -= absorbed;
     game.bossHp -= dmg - absorbed;
     recordHit(game, dmg - absorbed, absorbed);
+    if (game.stats) {
+      game.stats.turnDamage += dmg - absorbed;
+      game.stats.totalDamage += dmg - absorbed;
+    }
     return dmg;
   }
 
@@ -306,6 +337,7 @@ const TS_Engine = (() => {
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
     const hit = { hp: dmg - absorbed, absorbed };
+    if (game.stats) game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
 
     // 반격 (백 '반탄강기') — 이번 적 페이즈의 매 피격마다 돌려준다.
     // 소모되지 않고, 다음 내 합이 시작될 때 사라진다.
@@ -546,6 +578,22 @@ const TS_Engine = (() => {
       pushLog(game, `권갑(拳甲) — 막지 않고 넘겼습니다. 다음 합 첫 공격이 무거워집니다.`);
     }
 
+    // 검(劍) · 파일럿 계열 (ideanote/017-2) — 끝까지 이은 합을 보상한다.
+    // 이어 온 연계와 미리 채운 연계도 센다 — 둘 다 계열 자원이다.
+    const finaleLinks = weaponSum(game, 'finaleLinks');
+    if (finaleLinks && chainLinks(game) >= finaleLinks) {
+      const dmg = weaponSum(game, 'finaleDamage');
+      pushLog(game, `검(劍) — ${chainLinks(game)}수를 이어 마감. 추가 피해 ${dmg}.`);
+      applyDamageToBoss(game, dmg);
+      pushFx(game, 'playerAttack', {
+        amount: dmg, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, label: '검(劍)',
+      });
+      if (game.stats) game.stats.finaleFires += 1;
+      if (checkWinLose(game)) return;
+    }
+    // 쌓아 둔 연계는 이 합에 실제로 이은 만큼까지만 넘어간다.
+    game.chainBankNext = Math.min(chainLinks(game), game.chainKeepThisTurn);
+
     resolveBossPhase(game, n);
     if (checkWinLose(game)) return;
     game.turn += 1;
@@ -591,13 +639,21 @@ const TS_Engine = (() => {
       }
     }
 
+    // 태운다 (마교, ideanote/017-3) — HP를 내고 이을 수를 미리 채운다. 이 초식
+    // 자신의 연계 피해에도 곧바로 들어가도록 피해 계산보다 먼저 둔다.
+    if (card.chainPrime) {
+      game.chainBank += card.chainPrime;
+      pushLog(game, `연계를 미리 채웁니다 — +${card.chainPrime} (지금 ${chainLinks(game)}수).`);
+    }
+
     let effectiveDamage = card.damage + discardBonus;
     // 연계 (적) — 이번 턴에 "이미" 사용한 카드 수만큼 가산. cardsPlayedThisTurn은
     // 이 아래에서 증가하므로 자기 자신은 세지 않는다.
     if (card.chain) {
-      const bonus = card.chain * game.cardsPlayedThisTurn;
+      const links = chainLinks(game);
+      const bonus = card.chain * links;
       effectiveDamage += bonus;
-      if (bonus > 0) pushLog(game, `연계 ${game.cardsPlayedThisTurn}장 — 추가 피해 ${bonus}.`);
+      if (bonus > 0) pushLog(game, `연계 ${links}장 — 추가 피해 ${bonus}.`);
     }
     // 일격 (적 B라인) — 지금 남은 버퍼가 깊을수록 강하다. 연계가 "나중에
     // 낼수록 강함"이라면 일격은 "먼저 낼수록 강함"이라, 같은 합 안에서
@@ -668,6 +724,7 @@ const TS_Engine = (() => {
 
     if (card.hpCost) {
       game.playerHp -= card.hpCost;
+      if (game.stats) game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
       pushLog(game, `[${card.name}] — 체력 ${card.hpCost} 소모.`);
     }
     if (effectiveDamage > 0) {
@@ -685,7 +742,7 @@ const TS_Engine = (() => {
       pushLog(game, `[${card.name}] 사용.`);
     }
     const blockGain = (card.block || 0)
-      + (card.chainBlock ? card.chainBlock * game.cardsPlayedThisTurn : 0);
+      + (card.chainBlock ? card.chainBlock * chainLinks(game) : 0);
     if (blockGain > 0) {
       game.playerBlock += blockGain;
       pushLog(game, `방어도 +${blockGain}.`);
@@ -706,6 +763,12 @@ const TS_Engine = (() => {
     if (card.evade) {
       game.evadeCharges += card.evade;
       pushLog(game, `흘리기 ${card.evade}회 준비 (총 ${game.evadeCharges}회).`);
+    }
+    // 쌓는다 (정파, ideanote/017-3) — 이번 합에 실제로 이은 수 중 이만큼까지를
+    // 다음 합으로 넘긴다. 넘길 양은 합이 끝나는 순간 정해진다.
+    if (card.chainKeep) {
+      game.chainKeepThisTurn += card.chainKeep;
+      pushLog(game, `연계를 쌓아 둡니다 — 다음 합으로 최대 ${game.chainKeepThisTurn}수.`);
     }
     // 점혈 (흑 B라인) — 적의 준비된 초식 중 가장 비싼 것을 봉인한다.
     // 클로저가 작아지므로 돌아오는 버퍼도 줄어든다 — 안전을 사는 대신
@@ -834,5 +897,5 @@ const TS_Engine = (() => {
   }
 
   return { createGame, playCard, drawAction, previewIntent, gaugeLabel, buildDeck,
-    effectiveBreakThreshold };
+    effectiveBreakThreshold, chainLinks };
 })();

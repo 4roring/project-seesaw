@@ -36,7 +36,12 @@ const TS_Run = (() => {
 
     intel: [],         // 주루에서 미리 본 스테이지 번호
     fortuneUsed: 0,
-    pendingManual: false, // 기연 '비급' — 아직 익히지 못한 구결
+    pendingManual: 0,  // 기연 '비급' — 아직 익히지 못한 구결 권수 (출신 '비급 두 권'이면 2)
+    // 파일럿 — 무기 계열 (ideanote/017)
+    origin: null,          // 출신 키
+    pendingVeteran: false, // '강호 경험' — 병기를 고른 뒤 첫 비무 전에 전리품 한 번
+    preRun: false,         // 지금 보상 화면이 그 "나서기 전" 전리품인가
+    ultimateTaken: false,  // 궁극기는 런에 하나
     journal: [],       // 걸음의 기록 (ideanote/009 연대기의 재료)
   };
 
@@ -78,14 +83,18 @@ const TS_Run = (() => {
     state.nodeResult = null;
     state.intel = [];
     state.fortuneUsed = 0;
-    state.pendingManual = false;
+    state.pendingManual = 0;
+    state.origin = null;
+    state.pendingVeteran = false;
+    state.preRun = false;
+    state.ultimateTaken = false;
     state.journal = [];
   }
 
   // 시작 덱(count 포함 정의)을 카드 1장 = 항목 1개로 펼친다
   function expandStarter(color) {
     const out = [];
-    D.STARTER_DECKS[color].forEach((def) => {
+    (D.STARTER_DECKS[color] || (D.LINEAGE_STARTER || {})[color] || []).forEach((def) => {
       const n = def.count || 1;
       for (let i = 0; i < n; i++) {
         const card = { ...def };
@@ -100,8 +109,92 @@ const TS_Run = (() => {
     state.color = color;
     state.deck = expandStarter(color);
     state.stage = 1;
+    // 계열로 나서면 병기보다 출신을 먼저 고른다 (ideanote/017-5)
+    if (isLineage(color)) { state.phase = 'ORIGIN'; return; }
     if (D.WEAPONS_ENABLED) { state.phase = 'WEAPON'; return; }
     startBattle();
+  }
+
+  // ── 파일럿 — 무기 계열 (ideanote/017) ──────────────────────
+  // 4문파 데모와 나란히 돈다. 이 아래는 계열 런에서만 쓰인다.
+  function isLineage(key) { return !!(D.LINEAGES_ENABLED && D.LINEAGES && D.LINEAGES[key]); }
+
+  // 화면이 "누구로 나섰나"를 그릴 때 쓰는 이름표. 문파와 계열이 같은 모양이다.
+  function profile(key) { return (D.COLORS || {})[key] || (D.LINEAGES || {})[key] || {}; }
+
+  // 이 런이 쥘 수 있는 병기. 계열이면 그 계열의 둘뿐이고(계열이 곧 무기),
+  // 4문파면 계열 전용 병기를 뺀 전부다.
+  function weaponKeysFor(key) {
+    if (isLineage(key)) return D.LINEAGES[key].weapons.filter((k) => D.WEAPONS[k]);
+    return Object.keys(D.WEAPONS).filter((k) => !D.WEAPONS[k].lineageOnly);
+  }
+
+  function chooseOrigin(key) {
+    if (state.phase !== 'ORIGIN') return;
+    const o = (D.ORIGINS || []).find((x) => x.key === key);
+    if (!o) return;
+    state.origin = key;
+    if (o.maxHp) { state.playerMaxHp += o.maxHp; state.playerHp += o.maxHp; }
+    if (o.manuals) state.pendingManual = (state.pendingManual || 0) + o.manuals;
+    if (o.veteran) state.pendingVeteran = true;
+    note(`출신 — ${o.name}`);
+    state.phase = D.WEAPONS_ENABLED ? 'WEAPON' : 'BATTLE';
+    if (state.phase === 'BATTLE') startBattle();
+  }
+
+  function originFaction() {
+    const o = (D.ORIGINS || []).find((x) => x.key === state.origin);
+    return o ? o.faction : null;
+  }
+
+  // 덱에 든 그 세력 초식 수 (궁극기 자신은 세지 않는다)
+  function factionCount(faction) {
+    return state.deck.filter((c) => c.faction === faction && !c.ultimate).length;
+  }
+
+  // 전투에 들고 가는 덱. 궁극기는 이 순간 완전 조건을 본다 — 전리품을 받은
+  // 뒤에 세력 초식을 더 모으면 다음 전투부터 완전해진다.
+  function battleDeck() {
+    if (!isLineage(state.color)) return state.deck;
+    return state.deck.map((c) => {
+      if (!c.ultimate || !c.full) return c;
+      const need = c.fullAt || D.ULTIMATE_FULL_AT;
+      return factionCount(c.faction) >= need ? { ...c, ...c.full, isFull: true } : c;
+    });
+  }
+
+  function lineagePool() {
+    const fac = (D.FACTION_POOL || {})[state.color] || {};
+    return [...((D.LINEAGE_POOL || {})[state.color] || []), ...(fac.orthodox || []), ...(fac.demonic || [])];
+  }
+
+  // 희귀도로 조절한다 — 첫 전리품부터 50장이 모두 후보다 (017-4).
+  // 한 칸마다 희귀도를 먼저 굴리고, 그 희귀도 안에서 출신 가중으로 고른다.
+  function rollLineageRewards(kind, n) {
+    const odds = D.RARITY_ODDS[kind] || D.RARITY_ODDS.STAGE;
+    const total = odds.reduce((a, b) => a + b, 0);
+    const pool = lineagePool();
+    const fav = originFaction();
+    const weight = (c) => (fav && c.faction === fav ? D.ORIGIN_FACTION_WEIGHT : 1);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      let r = Math.random() * total, rarity = odds.length;
+      for (let j = 0; j < odds.length; j++) { if (r < odds[j]) { rarity = j + 1; break; } r -= odds[j]; }
+      const fresh = (c) => !out.some((o) => o.key === c.key);
+      let cands = pool.filter((c) => c.rarity === rarity && fresh(c));
+      if (!cands.length) cands = pool.filter(fresh);
+      if (!cands.length) break;
+      let x = Math.random() * cands.reduce((sum, c) => sum + weight(c), 0);
+      const pick = cands.find((c) => (x -= weight(c)) < 0) || cands[cands.length - 1];
+      out.push({ ...pick });
+    }
+    return out;
+  }
+
+  // 후보는 덱에 초식이 한 장이라도 있는 세력의 궁극기만 (017-5)
+  function ultimateOptions() {
+    const u = (D.ULTIMATES || {})[state.color] || {};
+    return Object.keys(u).filter((f) => factionCount(f) > 0).map((f) => ({ ...u[f] }));
   }
 
   // ── 유물 (gdd/15) ───────────────────────────────────────────
@@ -130,13 +223,22 @@ const TS_Run = (() => {
   // ── 신병이기 (gdd/14) ───────────────────────────────────────
   // 병기는 한 자루만 쥔다. 새 병기를 쥐려면 쥔 것을 놓는다 (14-2).
   function canEquip(key) {
-    return !!D.WEAPONS[key] && !state.weapons.includes(key);
+    return weaponKeysFor(state.color).includes(key) && !state.weapons.includes(key);
   }
   // 시작 시 한 자루. 맨손으로 나서는 길은 없다 (14-5).
   function chooseWeapon(key) {
     if (state.phase !== 'WEAPON') return;
     if (!canEquip(key)) return;
     state.weapons = [key];
+    // 출신 '강호 경험' — 첫 비무 전에 전리품 한 번 (ideanote/017-5)
+    if (state.pendingVeteran) {
+      state.pendingVeteran = false;
+      state.preRun = true;
+      state.rewardPicksLeft = 1;
+      state.rewardOptions = rollRewards();
+      state.phase = 'REWARD';
+      return;
+    }
     startBattle();
   }
   // 런 중 획득 — 쥔 것이 있으면 놓고 쥔다 (14-5)
@@ -153,7 +255,7 @@ const TS_Run = (() => {
     state.eliteEnemy = null;
     state.game = TS_Engine.createGame({
       enemy: currentEnemy(),
-      deck: state.deck,
+      deck: battleDeck(),
       playerHp: state.playerHp,
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
@@ -175,7 +277,7 @@ const TS_Run = (() => {
     state.battleKind = 'ELITE';
     state.game = TS_Engine.createGame({
       enemy,
-      deck: state.deck,
+      deck: battleDeck(),
       playerHp: state.playerHp,
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
@@ -226,7 +328,14 @@ const TS_Run = (() => {
       return;
     }
     state.rewardPicksLeft = 1;
-    state.rewardOptions = rollRewards();
+    // 궁극기 — 계열 런의 5스테이지 전리품을 대신한다 (ideanote/017-5).
+    // 덱에 세력 초식이 한 장도 없으면 보여 줄 궁극기가 없으니 희귀 초식을 준다.
+    if (isLineage(state.color) && state.stage === D.ULTIMATE_STAGE && !state.ultimateTaken) {
+      const ult = ultimateOptions();
+      state.rewardOptions = ult.length ? ult : rollLineageRewards('BOSS', D.REWARD_CHOICES);
+    } else {
+      state.rewardOptions = rollRewards();
+    }
     state.phase = 'REWARD';
   }
 
@@ -260,6 +369,9 @@ const TS_Run = (() => {
   }
 
   function rollRewards() {
+    if (isLineage(state.color)) {
+      return rollLineageRewards(state.battleKind === 'ELITE' ? 'ELITE' : 'STAGE', D.REWARD_CHOICES);
+    }
     return pickCards(poolForTier(tierForClearedStage(state.stage)), D.REWARD_CHOICES);
   }
 
@@ -284,6 +396,7 @@ const TS_Run = (() => {
   // ── 비무 보상 ───────────────────────────────────────────────
   function takeCard(option) {
     state.deck.push({ ...option });
+    if (option.ultimate) state.ultimateTaken = true;
     consumeRewardPick();
   }
 
@@ -309,6 +422,8 @@ const TS_Run = (() => {
       state.rewardOptions = rollRewards();
       return;
     }
+    // '강호 경험'의 전리품이면 이제 첫 비무로 나선다
+    if (state.preRun) { state.preRun = false; startBattle(); return; }
     // 엘리트를 이겨서 온 보상이면 걸음은 이미 소비했다 — 곧장 다음 비무로
     if (state.battleKind === 'ELITE') {
       // 꺾은 상대가 지녔던 것 — 병기와 유물을 함께 놓고 하나를 고른다.
@@ -327,7 +442,7 @@ const TS_Run = (() => {
 
   // 아직 안 쥔 무기 중 하나. 쥔 것을 놓을지는 제안 화면이 묻는다.
   function rollWeaponOffer() {
-    const pool = Object.keys(D.WEAPONS).filter((k) => !state.weapons.includes(k));
+    const pool = weaponKeysFor(state.color).filter((k) => !state.weapons.includes(k));
     if (!pool.length) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   }
@@ -338,7 +453,9 @@ const TS_Run = (() => {
   }
 
   function rollCrossroad() {
-    const rest = ['TAVERN', 'SECT_VISIT', 'ELITE'];
+    // 계열 런에는 문파 방문이 없다 — 017-5는 그 걸음을 "세력의 문"으로
+    // 바꾸는데, 그건 만남 걸음과 함께(순서 4) 한다. 파일럿에서는 뺀다.
+    const rest = isLineage(state.color) ? ['TAVERN', 'ELITE'] : ['TAVERN', 'SECT_VISIT', 'ELITE'];
     // 고묘 — 유물이 나오는 자리. 이게 없으면 런의 77%가 유물을 한 번도
     // 못 본다(실측). 시스템을 만들어 놓고 안 보이게 두면 없는 것과 같다.
     if (D.RELICS_ENABLED && rollRelicOffer()) rest.push('TOMB');
@@ -560,7 +677,7 @@ const TS_Run = (() => {
       if (!offer) return `${f.name} — 이미 모든 병기를 갖추었습니다.`;
       state.weaponOffer = offer;
       state.nodeView = weaponOfferView(offer, '기연 — 신병이기');
-      return null; // 손이 찼으면 무엇을 놓을지 골라야 한다
+      return null; // 쥔 병기를 놓고 쥘지, 지나칠지 골라야 한다
     }
     if (key === 'hermit') {
       // 잊을 초식을 고르게 한다 — 무작위로 지우면 대가가 아니라 사고다
@@ -590,7 +707,7 @@ const TS_Run = (() => {
       if (id === 'learn') {
         const card = pickCards(D.FORTUNE_CARDS.manual, 1)[0];
         state.deck.push({ ...card });
-        state.pendingManual = false;
+        state.pendingManual = Math.max(0, (state.pendingManual || 0) - 1);
         finishNode(`수련장 — 구결을 풀어 ${card.name}을(를) 익혔습니다.`);
         return;
       }
@@ -747,6 +864,7 @@ const TS_Run = (() => {
 
   return {
     get, newRun, chooseDeck, startBattle, syncBattleResult,
+    chooseOrigin, isLineage, profile, weaponKeysFor, factionCount,
     takeRelic, rollRelicOffer, relicSlotsFree, hasRelic,
     chooseWeapon, takeWeapon, canEquip, rollWeaponOffer, weaponOfferView,
     takeCard, skipReward, upgradableIndexes, currentEnemy,

@@ -20,12 +20,14 @@
 window.TS_Sim = (() => {
   const E = TS_Engine, R = TS_Run;
   const cost = (g, c) => Math.max(0, c.cost - g.pendingCostReduction);
+  // 연계 수 — 엔진의 chainLinks와 같다. 4문파 런에서는 cardsPlayedThisTurn 그대로.
+  const links = (g) => g.cardsPlayedThisTurn + (g.chainBank || 0);
 
   // 카드 1장의 즉시 가치를 코스트로 나눈 효율 점수
   function score(g, c) {
     let v = c.damage || 0;
-    if (c.chain) v += c.chain * g.cardsPlayedThisTurn;
-    if (c.chainBlock) v += c.chainBlock * g.cardsPlayedThisTurn * 0.6;
+    if (c.chain) v += c.chain * links(g);
+    if (c.chainBlock) v += c.chainBlock * links(g) * 0.6;
     if (c.blockToDamage) v += g.playerBlock * c.blockToDamage;
     if (c.discardAll) v += c.discardAll * (g.hand.length - 1);
     // 방어도/회복을 피해의 0.6배로 보던 초기 가중치는 방어형 컬러를 구조적으로
@@ -52,6 +54,10 @@ window.TS_Sim = (() => {
     // 3스테이지(철벽 무승, 빈틈 9) 사망이 1 → 17로 튀었다. 파훼 한 번은
     // 적 페이즈 하나를 통째로 지우므로 그만큼 값을 매긴다.
     if (c.breakThresholdDown) v += c.breakThresholdDown * 8;
+    // 파일럿 (ideanote/017-3). 쌓는다: 다음 합의 연계 1수는 연계 초식 한 장이
+    // 한 번 더 받는 가산쯤이다. 태운다: 지금 합의 연계를 곧바로 늘린다.
+    if (c.chainKeep) v += c.chainKeep * 2.5;
+    if (c.chainPrime) v += c.chainPrime * 3;
     v -= (c.hpCost || 0) * 0.8;
     return v / Math.max(0.5, cost(g, c));
   }
@@ -71,7 +77,7 @@ window.TS_Sim = (() => {
   //   3) 흘리기는 이미 남아 있으면 겹쳐 쓰지 않는다
   function planHolds(g, c) {
     if (c.discardAll && g.hand.length - 1 < 4) return true;
-    if ((c.chain || c.chainBlock) && g.cardsPlayedThisTurn < 2) return true;
+    if ((c.chain || c.chainBlock) && links(g) < 2) return true;
     if (c.evade && g.evadeCharges > 0) return true;
     return false;
   }
@@ -80,7 +86,7 @@ window.TS_Sim = (() => {
   // 틈 대비 효율도 따지지 않는다.
   function casualScore(g, c) {
     let v = c.damage || 0;
-    if (c.chain) v += c.chain * g.cardsPlayedThisTurn;
+    if (c.chain) v += c.chain * links(g);
     if (c.discardAll) v += c.discardAll * (g.hand.length - 1);
     return v;
   }
@@ -130,7 +136,7 @@ window.TS_Sim = (() => {
         // 파훼는 착지 위치가 아니라 이번 합의 몰아치기 총량으로 난다
         const breaks = g.momentumSpentThisTurn + cost(g, c) >= E.effectiveBreakThreshold(g);
         let v = (c.damage || 0)
-          + (c.chain ? c.chain * g.cardsPlayedThisTurn : 0)
+          + (c.chain ? c.chain * links(g) : 0)
           + (c.discardAll ? c.discardAll * (g.hand.length - 1) : 0)
           + (c.blockToDamage ? g.playerBlock * c.blockToDamage : 0);
         if (breaks) v += 40; // 페이즈 한 번을 통째로 지우는 값어치
@@ -327,6 +333,31 @@ window.TS_Sim = (() => {
     return live[0].id;
   }
 
+  // 전투 밖(출신 '강호 경험'의 첫 전리품)에서는 점수를 볼 전투가 없다
+  const IDLE = { cardsPlayedThisTurn: 0, chainBank: 0, playerBlock: 0, hand: [], gauge: -3,
+    playerHp: 80, playerMaxHp: 80, pendingCostReduction: 0 };
+
+  // 파일럿 보상 정책 (ideanote/017 "검증하려면") — 한 세력만 집는다 / 정+마를
+  // 둘 다 집는다 / 가장 좋은 것. 계열 카드는 어느 정책에서나 받는다.
+  function rewardChoice(st, options, casual, faction) {
+    const g = st.game || IDLE;
+    let cands = options.slice();
+    if (faction === 'orthodox' || faction === 'demonic') {
+      cands = cands.filter((c) => !c.faction || c.faction === faction);
+    } else if (faction === 'mixed') {
+      const fac = cands.filter((c) => c.faction);
+      if (fac.length) cands = fac;
+    }
+    // 궁극기는 덱에 더 많은 세력 쪽 — 순수 정책이면 곧 제 세력이다
+    const ults = cands.filter((c) => c.ultimate);
+    if (ults.length) {
+      return ults.sort((a, b) => R.factionCount(b.faction) - R.factionCount(a.faction))[0];
+    }
+    if (!cands.length) return null;
+    if (casual) return cands[Math.floor(Math.random() * cands.length)];
+    return cands.sort((a, b) => score(g, b) - score(g, a))[0];
+  }
+
   function run(color, runs, opts) {
     const planned = !!(opts && opts.planned);
     // 무기를 고정해 한 자루씩 재기 위한 손잡이. 생략하거나 'random'이면
@@ -338,10 +369,37 @@ window.TS_Sim = (() => {
     const casual = !!(opts && opts.casual);
     const search = !!(opts && opts.search);
     const nodeCap = (opts && opts.nodeCap) || 200;  // 400으로 올려도 결과가 같다
+    // 파일럿 손잡이 (ideanote/017) — 출신과 세력 정책
+    const origin = opts && opts.origin;
+    const faction = (opts && opts.faction) || 'best';
     const stat = { plays: 0, draws: 0, turns: 0, dist: {}, breaks: 0, nodes: {}, elites: 0 };
+    // 검증 지표 — 전투가 끝날 때 한 번씩 모은다
+    const lin = { battles: 0, turns: 0, carried: 0, carryTurns: 0, shareSum: 0, shareN: 0,
+      minHpSum: 0, finale: 0, saber: 0, ultOffers: 0, ultFull: 0, midCounts: [],
+      deckOrth: 0, deckDem: 0, deckLineage: 0, deckSize: 0 };
+    const seenGames = new WeakSet();
+    const recordBattle = (g) => {
+      if (!g || !g.stats || g.status === 'PLAYING' || seenGames.has(g)) return;
+      seenGames.add(g);
+      const s2 = g.stats;
+      lin.battles++; lin.turns += g.turn;
+      lin.carried += s2.carriedLinks; lin.carryTurns += s2.carryTurns;
+      const top = Math.max(s2.maxTurnDamage, s2.turnDamage);
+      if (s2.totalDamage > 0) { lin.shareSum += top / s2.totalDamage; lin.shareN++; }
+      lin.minHpSum += Math.max(0, s2.minHp) / g.playerMaxHp;
+      lin.finale += s2.finaleFires;
+      lin.saber += g.log.filter((l) => l.includes('도(刀) — 첫 초식')).length;
+    };
     let clears = 0, sum = 0;
     for (let i = 0; i < runs; i++) {
       R.newRun(); R.chooseDeck(color);
+      let midRecorded = false;
+      if (R.get().phase === 'ORIGIN') {
+        const keys = TS_DATA.ORIGINS.map((o) => o.key);
+        const pick = origin && origin !== 'random' ? origin : keys[Math.floor(Math.random() * keys.length)];
+        R.chooseOrigin(pick);
+        if (R.get().phase === 'ORIGIN') throw new Error(`고를 수 없는 출신: ${pick}`);
+      }
       if (relic) {
         const st0 = R.get();
         st0.relics = relic === 'random'
@@ -350,7 +408,7 @@ window.TS_Sim = (() => {
         st0.lastStandLeft = st0.relics.reduce((n, k) => n + (TS_DATA.RELICS[k].lastStand || 0), 0);
       }
       if (R.get().phase === 'WEAPON') {
-        const keys = Object.keys(TS_DATA.WEAPONS);
+        const keys = R.weaponKeysFor(color);
         const pick = weapon && weapon !== 'random'
           ? weapon : keys[Math.floor(Math.random() * keys.length)];
         R.chooseWeapon(pick);
@@ -363,11 +421,12 @@ window.TS_Sim = (() => {
         const st = R.get();
         if (st.phase === 'RUN_WON' || st.phase === 'RUN_LOST') break;
         if (st.phase === 'BATTLE') {
-          if (st.game.status !== 'PLAYING') { R.syncBattleResult(); continue; }
+          if (st.game.status !== 'PLAYING') { recordBattle(st.game); R.syncBattleResult(); continue; }
           const logAt = st.game.log.length;
           if (search) searchAutoTurn(st.game, stat, nodeCap);
           else autoTurn(st.game, stat, planned, casual);
           if (st.game.log.slice(logAt).some((l) => l.includes('[파훼!]'))) stat.breaks++;
+          recordBattle(st.game);
           R.syncBattleResult();
         } else if (st.phase === 'REWARD') {
           const o = st.rewardOptions.slice();
@@ -381,6 +440,20 @@ window.TS_Sim = (() => {
             const deckScores = st.deck.map((c) => score(st.game, c)).sort((a, b) => a - b);
             const median = deckScores[Math.floor(deckScores.length / 2)] || 0;
             if (best < median) { R.skipReward(); continue; }
+          }
+          if (R.isLineage(color)) {
+            // 궁극기 자리에서 덱의 세력 수를 남긴다 — 조건 N을 찾는 재료 (검증 4)
+            if (!midRecorded && st.stage === TS_DATA.ULTIMATE_STAGE && st.battleKind === 'STAGE' && !st.preRun) {
+              midRecorded = true;
+              lin.midCounts.push({ orth: R.factionCount('orthodox'), dem: R.factionCount('demonic') });
+            }
+            const pick = rewardChoice(st, o, casual, faction);
+            if (pick && pick.ultimate) {
+              lin.ultOffers++;
+              if (R.factionCount(pick.faction) >= (pick.fullAt || TS_DATA.ULTIMATE_FULL_AT)) lin.ultFull++;
+            }
+            if (pick) R.takeCard(pick); else R.skipReward();
+            continue;
           }
           // 초심자는 보상도 아무거나 고른다
           if (casual) { if (o.length) R.takeCard(o[Math.floor(Math.random() * o.length)]); else R.skipReward(); }
@@ -405,6 +478,13 @@ window.TS_Sim = (() => {
         } else break;
       }
       const st = R.get();
+      if (st.game) recordBattle(st.game);
+      if (R.isLineage(color)) {
+        lin.deckOrth += st.deck.filter((c) => c.faction === 'orthodox').length;
+        lin.deckDem += st.deck.filter((c) => c.faction === 'demonic').length;
+        lin.deckLineage += st.deck.filter((c) => c.lineage).length;
+        lin.deckSize += st.deck.length;
+      }
       if (st.phase === 'RUN_WON') { clears++; sum += 10; }
       else { sum += st.stage; stat.dist[st.stage] = (stat.dist[st.stage] || 0) + 1; }
     }
@@ -420,6 +500,22 @@ window.TS_Sim = (() => {
       breakRate: (stat.breaks / stat.turns * 100).toFixed(0) + '%',
       nodes: stat.nodes,
       deathAt: stat.dist,
+      lineage: R.isLineage(color) ? {
+        origin: origin || '무작위',
+        faction,
+        남긴연계_합당: +(lin.carried / Math.max(1, lin.carryTurns)).toFixed(2),
+        최대합_비중: Math.round(lin.shareSum / Math.max(1, lin.shareN) * 100),
+        최저HP_비율: Math.round(lin.minHpSum / Math.max(1, lin.battles) * 100),
+        검_합당: +(lin.finale / Math.max(1, lin.turns)).toFixed(2),
+        도_합당: +(lin.saber / Math.max(1, lin.turns)).toFixed(2),
+        덱_정파: +(lin.deckOrth / runs).toFixed(1),
+        덱_마교: +(lin.deckDem / runs).toFixed(1),
+        덱_계열: +(lin.deckLineage / runs).toFixed(1),
+        덱_장수: +(lin.deckSize / runs).toFixed(1),
+        궁극기_받음: lin.ultOffers,
+        궁극기_완전: lin.ultFull,
+        중간_세력수: lin.midCounts,
+      } : undefined,
     };
   }
 
@@ -436,6 +532,16 @@ window.TS_Sim = (() => {
     Object.entries(D2.REWARD_POOLS).forEach(([col, tiers]) =>
       Object.entries(tiers).forEach(([t, cards]) =>
         cards.forEach((c) => all.push({ col, c, where: `보상 티어${t}` }))));
+    // 파일럿 — 무기 계열 (ideanote/017)
+    Object.entries(D2.LINEAGE_STARTER || {}).forEach(([col, cards]) =>
+      cards.forEach((c) => all.push({ col, c, where: '계열 시작 덱' })));
+    Object.entries(D2.LINEAGE_POOL || {}).forEach(([col, cards]) =>
+      cards.forEach((c) => all.push({ col, c, where: '계열 20장' })));
+    Object.entries(D2.FACTION_POOL || {}).forEach(([col, facs]) =>
+      Object.entries(facs).forEach(([f, cards]) =>
+        cards.forEach((c) => all.push({ col, c, where: `세력 ${f}` }))));
+    Object.entries(D2.ULTIMATES || {}).forEach(([col, facs]) =>
+      Object.values(facs).forEach((c) => all.push({ col, c, where: '궁극기' })));
 
     // 1) 강화가 어떤 수치도 낮추면 안 된다
     const LOWER_IS_BETTER = new Set(['cost', 'hpCost']);
@@ -450,6 +556,26 @@ window.TS_Sim = (() => {
       });
     });
 
+    // 1-2) 궁극기가 완전해질 때 어떤 수치도 낮아지면 안 된다
+    all.forEach(({ col, c, where }) => {
+      if (!c.full) return;
+      Object.entries(c.full).forEach(([k, v]) => {
+        const base = c[k];
+        if (typeof base !== 'number' || typeof v !== 'number') return;
+        const worse = LOWER_IS_BETTER.has(k) ? v > base : v < base;
+        if (worse) problems.push(`${col} ${where} · ${c.name}: 완전해지면 ${k} ${base} → ${v}로 나빠짐`);
+      });
+    });
+
+    // 1-3) 희귀도 구성 — 계열 9/8/3, 세력 4/3/2 (ideanote/017-4)
+    const mix = (cards) => [1, 2, 3].map((r) => cards.filter((c) => c.rarity === r).length).join('/');
+    Object.entries(D2.LINEAGE_POOL || {}).forEach(([col, cards]) => {
+      if (mix(cards) !== '9/8/3') problems.push(`${col} 계열 20장의 희귀도 구성이 ${mix(cards)} — 017-4는 9/8/3`);
+    });
+    Object.entries(D2.FACTION_POOL || {}).forEach(([col, facs]) => Object.entries(facs).forEach(([f, cards]) => {
+      if (mix(cards) !== '4/3/2') problems.push(`${col} 세력 ${f}의 희귀도 구성이 ${mix(cards)} — 017-4는 4/3/2`);
+    }));
+
     // 2) 되감기 불변 규칙 — cost - rewind >= 1 (소멸 카드는 예외)
     all.forEach(({ col, c, where }) => {
       if (c.rewind && !c.exhaust && c.cost - c.rewind < 1) {
@@ -462,7 +588,9 @@ window.TS_Sim = (() => {
     const KNOWN = new Set(['key','name','cost','count','desc','upgraded','unique','exhaust',
       'effect','persistentPayload','damage','block','heal','draw','rewind','counter','evade',
       'lifesteal','chain','chainBlock','discardAll','blockToDamage','hpCost','bossWeaken',
-      'breakThresholdDown','deepStrike','rageScale','surge','sealSkill','drainPower']);
+      'breakThresholdDown','deepStrike','rageScale','surge','sealSkill','drainPower',
+      // 파일럿 (ideanote/017) — 이름표 필드와 동사 필드
+      'rarity','lineage','faction','ultimate','fullAt','full','isFull','chainKeep','chainPrime']);
     const unseen = new Set();
     all.forEach(({ c }) => Object.keys(c).forEach((k) => { if (!KNOWN.has(k)) unseen.add(k); }));
     unseen.forEach((k) => problems.push(`점수 함수가 모르는 필드: ${k} — sim.js score()에 넣으세요`));
