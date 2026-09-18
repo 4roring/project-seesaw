@@ -36,12 +36,16 @@ const TS_Run = (() => {
 
     intel: [],         // 주루에서 미리 본 스테이지 번호
     fortuneUsed: 0,
-    pendingManual: 0,  // 기연 '비급' — 아직 익히지 못한 구결 권수 (출신 '비급 두 권'이면 2)
-    // 파일럿 — 무기 계열 (ideanote/017)
-    origin: null,          // 출신 키
-    pendingVeteran: false, // '강호 경험' — 병기를 고른 뒤 첫 비무 전에 전리품 한 번
-    preRun: false,         // 지금 보상 화면이 그 "나서기 전" 전리품인가
-    ultimateTaken: false,  // 궁극기는 런에 하나
+    pendingManual: 0,  // 기연 '비급' — 아직 익히지 못한 구결 권수 (부스터 '비급 두 권'이면 2)
+    // 파일럿 1.5 — 무기 계열 (ideanote/017 · drafts/017-pilot-1.5)
+    booster: null,         // 고른 시작 부스터 키
+    boosterOffer: [],      // 보여 준 부스터 셋
+    preRun: false,         // 지금 보상 화면이 "나서기 전" 전리품인가
+    preRunKeep: false,     // 같은 셋에서 여러 장을 거두는가 ('강호 경험' — 3장 중 2장)
+    ultimateTaken: false,  // 오의는 런에 하나
+    // 마교의 대가 (초안 C-3) — 검증 지표로도 쓴다
+    burnMaxHpLost: 0, drainMaxHpGained: 0, drainKills: 0,
+    burnCarry: 0,          // 10에 못 미쳐 아직 정산하지 않은 태운 HP
     journal: [],       // 걸음의 기록 (ideanote/009 연대기의 재료)
   };
 
@@ -84,10 +88,12 @@ const TS_Run = (() => {
     state.intel = [];
     state.fortuneUsed = 0;
     state.pendingManual = 0;
-    state.origin = null;
-    state.pendingVeteran = false;
+    state.booster = null;
+    state.boosterOffer = [];
     state.preRun = false;
+    state.preRunKeep = false;
     state.ultimateTaken = false;
+    state.burnMaxHpLost = 0; state.drainMaxHpGained = 0; state.drainKills = 0; state.burnCarry = 0;
     state.journal = [];
   }
 
@@ -109,9 +115,9 @@ const TS_Run = (() => {
     state.color = color;
     state.deck = expandStarter(color);
     state.stage = 1;
-    // 계열로 나서면 병기보다 출신을 먼저 고른다 (ideanote/017-5)
-    if (isLineage(color)) { state.phase = 'ORIGIN'; return; }
     if (D.WEAPONS_ENABLED) { state.phase = 'WEAPON'; return; }
+    // 계열은 곧 무기라 병기를 끈 데모에서도 부스터는 고른다
+    if (isLineage(color)) { openBoosters(); return; }
     startBattle();
   }
 
@@ -129,53 +135,78 @@ const TS_Run = (() => {
     return Object.keys(D.WEAPONS).filter((k) => !D.WEAPONS[k].lineageOnly);
   }
 
-  function chooseOrigin(key) {
-    if (state.phase !== 'ORIGIN') return;
-    const o = (D.ORIGINS || []).find((x) => x.key === key);
-    if (!o) return;
-    state.origin = key;
-    if (o.maxHp) { state.playerMaxHp += o.maxHp; state.playerHp += o.maxHp; }
-    if (o.manuals) state.pendingManual = (state.pendingManual || 0) + o.manuals;
-    if (o.veteran) state.pendingVeteran = true;
-    note(`출신 — ${o.name}`);
-    state.phase = D.WEAPONS_ENABLED ? 'WEAPON' : 'BATTLE';
-    if (state.phase === 'BATTLE') startBattle();
+  // ── 시작 부스터 (초안 C-1) ─────────────────────────────────
+  // 계열 · 병기를 고른 뒤 풀에서 무작위 셋을 보여 주고 하나를 고른다.
+  function boosterDef(key) { return (D.BOOSTERS || []).find((b) => b.key === key); }
+  function openBoosters() {
+    state.boosterOffer = shuffle((D.BOOSTERS || []).map((b) => b.key)).slice(0, D.BOOSTER_CHOICES);
+    state.phase = 'ORIGIN';
   }
 
-  function originFaction() {
-    const o = (D.ORIGINS || []).find((x) => x.key === state.origin);
-    return o ? o.faction : null;
+  // 전향 — 기본 초식 8장만 그 세력 일반 초식으로 (계열 고유 2장은 남긴다)
+  function convertBasics(faction) {
+    const commons = factionPool(faction).filter((c) => c.rarity === 1);
+    state.deck = state.deck.map((c) => (c.basic ? { ...commons[Math.floor(Math.random() * commons.length)] } : c));
   }
 
-  // 덱에 든 그 세력 초식 수 (궁극기 자신은 세지 않는다)
+  function chooseBooster(key) {
+    if (state.phase !== 'ORIGIN' || !state.boosterOffer.includes(key)) return;
+    const b = boosterDef(key);
+    if (!b) return;
+    state.booster = key;
+    note(`시작 부스터 — ${b.name}`);
+    if (b.minReturn) state.minReturn += b.minReturn;
+    if (b.manuals) state.pendingManual = (state.pendingManual || 0) + b.manuals;
+    if (b.convert) convertBasics(b.convert);
+    if (b.upgrades) {
+      shuffle(upgradableIndexes()).slice(0, b.upgrades).forEach((i) => upgradeAt(i));
+    }
+    // 나서기 전의 전리품 — 세력 초식 3장 중 1장, 또는 무작위 3장 중 2장
+    if (b.factionPick || b.veteranPicks) {
+      state.preRun = true;
+      state.preRunKeep = !!b.veteranPicks;
+      state.rewardPicksLeft = b.veteranPicks || 1;
+      state.rewardOptions = rollLineageRewards('STAGE', D.REWARD_CHOICES, b.factionPick || null);
+      state.phase = 'REWARD';
+      return;
+    }
+    startBattle();
+  }
+
+  function favorFaction() { const b = boosterDef(state.booster); return b ? b.favor || null : null; }
+
+  // 덱에 든 그 세력 초식 수 (오의 자신은 세지 않는다)
   function factionCount(faction) {
     return state.deck.filter((c) => c.faction === faction && !c.ultimate).length;
   }
 
-  // 전투에 들고 가는 덱. 궁극기는 이 순간 완전 조건을 본다 — 전리품을 받은
-  // 뒤에 세력 초식을 더 모으면 다음 전투부터 완전해진다.
-  function battleDeck() {
-    if (!isLineage(state.color)) return state.deck;
-    return state.deck.map((c) => {
-      if (!c.ultimate || !c.full) return c;
-      const need = c.fullAt || D.ULTIMATE_FULL_AT;
-      return factionCount(c.faction) >= need ? { ...c, ...c.full, isFull: true } : c;
-    });
+  // 전투 시작 효과 — 부스터가 비무마다 새로 까는 것 (진법 · 쾌수)
+  function battleExtras() {
+    const b = boosterDef(state.booster) || {};
+    const opening = [];
+    if (b.opening === 'guard') {
+      opening.push({ block: 5, effect: { id: 'booster-guard', name: '호신진', kind: 'BLOCK_ON_TURN_START', amount: 5, turns: 1 } });
+    } else if (b.opening === 'break') {
+      opening.push({ effect: { id: 'booster-break', name: '파공진', kind: 'BOSS_VULNERABLE_AURA', amount: 15, turns: 2 } });
+    }
+    return { openingEffects: opening, extraHand: b.extraHand || 0 };
   }
 
+  function factionPool(faction) { return (((D.FACTION_POOL || {})[state.color] || {})[faction]) || []; }
   function lineagePool() {
-    const fac = (D.FACTION_POOL || {})[state.color] || {};
-    return [...((D.LINEAGE_POOL || {})[state.color] || []), ...(fac.orthodox || []), ...(fac.demonic || [])];
+    return [...((D.LINEAGE_POOL || {})[state.color] || []),
+      ...(D.FACTION_ORDER || []).flatMap((f) => factionPool(f))];
   }
 
-  // 희귀도로 조절한다 — 첫 전리품부터 50장이 모두 후보다 (017-4).
-  // 한 칸마다 희귀도를 먼저 굴리고, 그 희귀도 안에서 출신 가중으로 고른다.
-  function rollLineageRewards(kind, n) {
+  // 희귀도로 조절한다 — 첫 전리품부터 전부 후보다 (017-4).
+  // 한 칸마다 희귀도를 먼저 굴리고, 그 희귀도 안에서 부스터 가중으로 고른다.
+  // only를 주면 그 세력 풀에서만 (세력 부스터의 "3장 중 1장").
+  function rollLineageRewards(kind, n, only) {
     const odds = D.RARITY_ODDS[kind] || D.RARITY_ODDS.STAGE;
     const total = odds.reduce((a, b) => a + b, 0);
-    const pool = lineagePool();
-    const fav = originFaction();
-    const weight = (c) => (fav && c.faction === fav ? D.ORIGIN_FACTION_WEIGHT : 1);
+    const pool = only ? factionPool(only) : lineagePool();
+    const fav = favorFaction();
+    const weight = (c) => (fav && c.faction === fav ? D.BOOSTER_FACTION_WEIGHT : 1);
     const out = [];
     for (let i = 0; i < n; i++) {
       let r = Math.random() * total, rarity = odds.length;
@@ -184,17 +215,33 @@ const TS_Run = (() => {
       let cands = pool.filter((c) => c.rarity === rarity && fresh(c));
       if (!cands.length) cands = pool.filter(fresh);
       if (!cands.length) break;
-      let x = Math.random() * cands.reduce((sum, c) => sum + weight(c), 0);
-      const pick = cands.find((c) => (x -= weight(c)) < 0) || cands[cands.length - 1];
-      out.push({ ...pick });
+      out.push({ ...weightedPick(cands, weight) });
     }
     return out;
   }
 
-  // 후보는 덱에 초식이 한 장이라도 있는 세력의 궁극기만 (017-5)
+  function weightedPick(cands, weight) {
+    let x = Math.random() * cands.reduce((sum, c) => sum + weight(c), 0);
+    return cands.find((c) => (x -= weight(c)) < 0) || cands[cands.length - 1];
+  }
+
+  // 오의 — 무작위 3장 중 1장, 덱에 없는 세력 것도 (초안 C-2).
+  // 세력 부스터: 속가제자 · 연줄 · 잔당은 그 세력 ×2, 비전 · 맹세 · 혈서는 반드시 한 장.
   function ultimateOptions() {
-    const u = (D.ULTIMATES || {})[state.color] || {};
-    return Object.keys(u).filter((f) => factionCount(f) > 0).map((f) => ({ ...u[f] }));
+    let pool = ((D.ULTIMATES || {})[state.color] || []).slice();
+    const b = boosterDef(state.booster) || {};
+    const out = [];
+    if (b.ultGuarantee) {
+      const own = pool.filter((c) => c.faction === b.ultGuarantee);
+      if (own.length) out.push(own[Math.floor(Math.random() * own.length)]);
+    }
+    const weight = (c) => (b.favor && c.faction === b.favor ? D.BOOSTER_FACTION_WEIGHT : 1);
+    while (out.length < D.ULTIMATE_CHOICES) {
+      pool = pool.filter((c) => !out.includes(c));
+      if (!pool.length) break;
+      out.push(weightedPick(pool, weight));
+    }
+    return shuffle(out).map((c) => ({ ...c }));
   }
 
   // ── 유물 (gdd/15) ───────────────────────────────────────────
@@ -230,15 +277,8 @@ const TS_Run = (() => {
     if (state.phase !== 'WEAPON') return;
     if (!canEquip(key)) return;
     state.weapons = [key];
-    // 출신 '강호 경험' — 첫 비무 전에 전리품 한 번 (ideanote/017-5)
-    if (state.pendingVeteran) {
-      state.pendingVeteran = false;
-      state.preRun = true;
-      state.rewardPicksLeft = 1;
-      state.rewardOptions = rollRewards();
-      state.phase = 'REWARD';
-      return;
-    }
+    // 계열 런은 병기를 쥔 뒤 시작 부스터를 고른다 (초안 C-1)
+    if (isLineage(state.color) && !state.booster) { openBoosters(); return; }
     startBattle();
   }
   // 런 중 획득 — 쥔 것이 있으면 놓고 쥔다 (14-5)
@@ -255,7 +295,8 @@ const TS_Run = (() => {
     state.eliteEnemy = null;
     state.game = TS_Engine.createGame({
       enemy: currentEnemy(),
-      deck: battleDeck(),
+      deck: state.deck,
+      ...battleExtras(),
       playerHp: state.playerHp,
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
@@ -277,7 +318,8 @@ const TS_Run = (() => {
     state.battleKind = 'ELITE';
     state.game = TS_Engine.createGame({
       enemy,
-      deck: battleDeck(),
+      deck: state.deck,
+      ...battleExtras(),
       playerHp: state.playerHp,
       playerMaxHp: state.playerMaxHp,
       handCap: (D.COLORS[state.color] || {}).handCap,
@@ -301,6 +343,27 @@ const TS_Run = (() => {
     if (g.status !== 'WON') return;
 
     state.playerHp = g.playerHp; // 전투 종료 시점 체력을 이어받음
+    // 마교의 대가 (초안 C-3) — 태운 HP 10당 최대 체력 -1, 흡성 막타면 +2.
+    // 정산은 비무가 끝날 때지만 10에 못 미친 나머지는 다음 비무로 넘긴다 — 비무마다
+    // 버리면 순수 마교도 한 비무에 평균 5.7만 태워서 대가가 거의 안 붙었다.
+    if (isLineage(state.color)) {
+      const burned = state.burnCarry + ((g.stats && g.stats.hpBurned) || 0);
+      const lost = Math.floor(burned / D.BURN_PER_MAXHP);
+      state.burnCarry = burned - lost * D.BURN_PER_MAXHP;
+      if (lost > 0) {
+        state.playerMaxHp = Math.max(1, state.playerMaxHp - lost);
+        state.playerHp = Math.min(state.playerHp, state.playerMaxHp);
+        state.burnMaxHpLost += lost;
+        note(`태운 HP가 쌓여 최대 체력 -${lost}`);
+      }
+      if (g.drainKill) {
+        state.playerMaxHp += D.DRAIN_KILL_MAXHP;
+        state.playerHp += D.DRAIN_KILL_MAXHP;
+        state.drainMaxHpGained += D.DRAIN_KILL_MAXHP;
+        state.drainKills += 1;
+        note(`흡성으로 막타 — 최대 체력 +${D.DRAIN_KILL_MAXHP}`);
+      }
+    }
     state.lastStandLeft = g.lastStandLeft; // 호심경은 강호행에 한 번뿐이다
     // 오도비 — 전투에서 낸 파훼를 강호행의 성장으로 옮긴다
     const grow = relicSum('breakGrowth') * g.breakCount;
@@ -328,11 +391,9 @@ const TS_Run = (() => {
       return;
     }
     state.rewardPicksLeft = 1;
-    // 궁극기 — 계열 런의 5스테이지 전리품을 대신한다 (ideanote/017-5).
-    // 덱에 세력 초식이 한 장도 없으면 보여 줄 궁극기가 없으니 희귀 초식을 준다.
+    // 오의 — 계열 런의 5스테이지 전리품을 대신한다 (초안 C-2)
     if (isLineage(state.color) && state.stage === D.ULTIMATE_STAGE && !state.ultimateTaken) {
-      const ult = ultimateOptions();
-      state.rewardOptions = ult.length ? ult : rollLineageRewards('BOSS', D.REWARD_CHOICES);
+      state.rewardOptions = ultimateOptions();
     } else {
       state.rewardOptions = rollRewards();
     }
@@ -397,6 +458,8 @@ const TS_Run = (() => {
   function takeCard(option) {
     state.deck.push({ ...option });
     if (option.ultimate) state.ultimateTaken = true;
+    // '강호 경험' — 같은 셋에서 한 장 더
+    if (state.preRunKeep) state.rewardOptions = state.rewardOptions.filter((o) => o.key !== option.key);
     consumeRewardPick();
   }
 
@@ -419,11 +482,11 @@ const TS_Run = (() => {
   function consumeRewardPick() {
     state.rewardPicksLeft -= 1;
     if (state.rewardPicksLeft > 0) {
-      state.rewardOptions = rollRewards();
-      return;
+      if (!state.preRunKeep) state.rewardOptions = rollRewards();
+      if (state.rewardOptions.length) return;
     }
-    // '강호 경험'의 전리품이면 이제 첫 비무로 나선다
-    if (state.preRun) { state.preRun = false; startBattle(); return; }
+    // 나서기 전의 전리품이면 이제 첫 비무로 나선다
+    if (state.preRun) { state.preRun = false; state.preRunKeep = false; startBattle(); return; }
     // 엘리트를 이겨서 온 보상이면 걸음은 이미 소비했다 — 곧장 다음 비무로
     if (state.battleKind === 'ELITE') {
       // 꺾은 상대가 지녔던 것 — 병기와 유물을 함께 놓고 하나를 고른다.
@@ -864,7 +927,7 @@ const TS_Run = (() => {
 
   return {
     get, newRun, chooseDeck, startBattle, syncBattleResult,
-    chooseOrigin, isLineage, profile, weaponKeysFor, factionCount,
+    chooseBooster, boosterDef, isLineage, profile, weaponKeysFor, factionCount,
     takeRelic, rollRelicOffer, relicSlotsFree, hasRelic,
     chooseWeapon, takeWeapon, canEquip, rollWeaponOffer, weaponOfferView,
     takeCard, skipReward, upgradableIndexes, currentEnemy,

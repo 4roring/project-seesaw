@@ -113,17 +113,25 @@ TS_DATA.WEAPONS_ENABLED = false;           // 무기 축을 통째로 끄고 비
 // 갈림길이 밸런스에 얼마를 보태는지 가르는 A/B
 TS_DATA.CROSSROAD_ENABLED = false; TS_DATA.STAGE_HEAL_RATIO = 0.5;
 
-// 파일럿 — 무기 계열 (ideanote/017). 출신과 세력 정책을 고정해 잰다
-TS_Sim.run('BLADE', 300, { origin: 'life_pill', faction: 'orthodox' }); // 한 세력만 집는다
-TS_Sim.run('BLADE', 300, { faction: 'mixed' });  // 정+마를 둘 다 · 생략하면 'best'(점수만)
-// 결과의 lineage 칸: 남긴연계_합당 · 최대합_비중 · 최저HP_비율 · 검_합당 · 도_합당 ·
-// 덱_정파 · 덱_마교 · 궁극기_받음/완전 · 중간_세력수(5스테이지 전리품 시점의 덱)
+// 파일럿 1.5 — 무기 계열 (ideanote/017 · drafts/017-pilot-1.5). 부스터와 세력 정책을 고정해 잰다
+TS_Sim.run('BLADE', 300, { booster: 'two_manuals', faction: 'heterodox' }); // 한 세력만 집는다
+TS_Sim.run('BLADE', 300, { faction: 'mixed' });   // 세력 초식이면 무엇이든 · 생략하면 'best'(점수만)
+TS_Sim.run('BLADE', 300, { noUlt: true });        // 오의를 끄고 비교
+TS_DATA.WEAPONS.blade_sword.finaleAtEnd = true;   // 검-2(끝날 때 네 수)와 비교하는 손잡이
+// 결과의 lineage 칸: 남긴연계 · 최대합 비중 · 검/도/마무리 합당 · 마무리전 연계 ·
+// 봉인 · 연계드로우 · 받은피해 · 태운HP · 최대체력 변화 · 흡성막타 · 한 방 분포 ·
+// 덱의 세력별 장수 · 오의 받음/가중 비율/보장 · 부스터 고름
 ```
 
 > **파일럿은 4문파 데모와 나란히 돕니다.** 계열 런에서만 쓰는 필드
 > (`chainBank` · `chainKeep` · `chainPrime`)는 4문파 런에서 늘 0이라, 4문파
 > 수치는 파일럿을 넣기 전과 같아야 합니다 — 넣은 뒤 병기 여섯 평균이
-> 0.08 이내로 같았습니다(4색 × 300런).
+> 0.08 이내로 같았습니다(4색 × 300런). 파일럿 1.5는 `Math.random`을 고정한
+> 4색 × 정책 여섯 벌의 결과가 넣기 전과 **한 글자까지** 같았습니다.
+>
+> 브라우저 없이 돌리려면 `node web-demo/sim-node.js "TS_Sim.run('BLADE', 300)"`.
+> `SEED=12345`를 앞에 붙이면 무작위가 고정돼, 코드를 고치기 전 · 후의 출력을
+> 해시로 비교할 수 있습니다.
 
 간단한 탐욕 AI로 런을 자동 플레이해 클리어율·평균 도달 스테이지·턴당
 카드 사용 수·사망 스테이지 분포를 돌려줍니다. **턴당 카드 사용 수는 무한

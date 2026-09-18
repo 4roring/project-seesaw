@@ -72,6 +72,14 @@ const TS_Engine = (() => {
       chainBank: 0,          // 이번 합의 연계 수에 더해지는 연계 (이어 온 것 + 미리 채운 것)
       chainBankNext: 0,      // 합이 끝날 때 정해져 다음 합으로 넘어가는 연계
       chainKeepThisTurn: 0,  // 이번 합에 '쌓는다' 초식이 남기기로 한 연계의 상한
+      // 파일럿 1.5 (ideanote/drafts/017-pilot-1.5) — 연계를 "비우는" 초식(마무리 ·
+      // 사파 봉인)이 있다. 이번 합에 낸 장수는 손패 보충과 도(刀)가 따로 읽으므로
+      // 지우지 않고, 연계로 세지 않을 앞쪽 장수만 따로 둔다.
+      chainOffset: 0,
+      maxLinksThisTurn: 0,   // 검(劍)-1 — 이번 합에 연계가 한 번이라도 닿은 최댓값
+      enemyHitReduce: 0,     // 사파 봉인 — 적의 다음 초식 피해를 이만큼 깎는다
+      enemyHitReduceAll: false, // 오의 천지점혈 — 다음 적 페이즈의 모든 초식에
+      drainKill: false,      // 마교 흡성 초식으로 쓰러뜨렸는가 (최대 체력을 되찾는다)
       // 최소 반환 보장은 런 중에 깎일 수 있다 — 기연 '영약'의 대가
       // (ideanote/012 12-6). 합의 88%가 이 값에서 시작하므로 1칸이 무겁다.
       minMomentumReturn: config.minReturn != null ? config.minReturn : D.MIN_MOMENTUM_RETURN,
@@ -128,8 +136,16 @@ const TS_Engine = (() => {
     game.stats = {
       turnDamage: 0, maxTurnDamage: 0, totalDamage: 0, minHp: game.playerHp,
       carriedLinks: 0, carryTurns: 0, finaleFires: 0,
+      // 파일럿 1.5 지표
+      finisherPlays: 0, finisherLinks: 0, hpBurned: 0, damageTaken: 0,
+      sealPlays: 0, sealPrevented: 0, chainDrawn: 0, maxHit: 0,
     };
-    drawCards(game, D.HAND_SIZE);
+    // 시작 부스터의 전투 시작 효과 (진법 · 쾌수) — 런 층이 넘겨준다
+    (config.openingEffects || []).forEach((e) => {
+      if (e.block) game.playerBlock += e.block;
+      if (e.effect) addOrRefreshEffect(game, e.effect);
+    });
+    drawCards(game, D.HAND_SIZE + (config.extraHand || 0));
     pushLog(game, `전투 시작 — ${enemy.name} (HP ${enemy.hp})`);
     return game;
   }
@@ -172,6 +188,7 @@ const TS_Engine = (() => {
     }
     game.playerBlock = 0;
     game.counterDamage = 0; // 반탄은 적 페이즈 하나만 버틴다
+    if (game.enemyHitReduceAll) { game.enemyHitReduce = 0; game.enemyHitReduceAll = false; }
     // pendingCostReduction / pendingDamageMultiplier는 리셋하지 않는다 — 실제로
     // 카드에 소비될 때까지 턴을 넘겨도 유지 (gdd/06 6-6)
     game.cardsPlayedThisTurn = 0;
@@ -186,6 +203,8 @@ const TS_Engine = (() => {
     game.chainBank = game.chainBankNext || 0;
     game.chainBankNext = 0;
     game.chainKeepThisTurn = 0;
+    game.chainOffset = 0;
+    game.maxLinksThisTurn = game.chainBank;
     if (game.stats) {
       game.stats.maxTurnDamage = Math.max(game.stats.maxTurnDamage, game.stats.turnDamage);
       game.stats.turnDamage = 0;
@@ -247,7 +266,18 @@ const TS_Engine = (() => {
   // 연계 수 — 이번 합에 이은 초식 + 합을 넘어 이어 온 연계(정파 '쌓는다') +
   // HP로 미리 채운 연계(마교 '태운다'). 4문파 런에서는 chainBank가 늘 0이라
   // 예전 cardsPlayedThisTurn과 같은 값이다 (ideanote/017-3).
-  function chainLinks(game) { return game.cardsPlayedThisTurn + (game.chainBank || 0); }
+  function chainLinks(game) {
+    return Math.max(0, game.cardsPlayedThisTurn - (game.chainOffset || 0)) + (game.chainBank || 0);
+  }
+
+  // 연계를 비운다 — 마무리와 사파 봉인. 지금 내는 초식까지 세지 않도록
+  // 한 장 더 앞으로 민다(이 초식은 아래에서 cardsPlayedThisTurn에 더해진다).
+  // 비우기 전에 검(劍)-1이 볼 최댓값을 남긴다 — 지금 초식도 한 수다.
+  function clearLinks(game) {
+    game.maxLinksThisTurn = Math.max(game.maxLinksThisTurn || 0, chainLinks(game) + 1);
+    game.chainOffset = game.cardsPlayedThisTurn + 1;
+    game.chainBank = 0;
+  }
 
   // 이번 합에 실제로 넘어야 하는 빈틈. 하한을 두는 이유는 gdd/02 2-3.
   function effectiveBreakThreshold(game) {
@@ -303,6 +333,7 @@ const TS_Engine = (() => {
     if (game.stats) {
       game.stats.turnDamage += dmg - absorbed;
       game.stats.totalDamage += dmg - absorbed;
+      game.stats.maxHit = Math.max(game.stats.maxHit, dmg);
     }
     return dmg;
   }
@@ -322,6 +353,14 @@ const TS_Engine = (() => {
       return 0;
     }
     let dmg = rawDamage;
+    // 사파 봉인 — 방어도보다 먼저 깎는다. 한 번(천지점혈이면 이번 적 페이즈 전부)
+    if (game.enemyHitReduce > 0 && dmg > 0) {
+      const cut = Math.min(dmg, game.enemyHitReduce);
+      dmg -= cut;
+      if (game.stats) game.stats.sealPrevented += cut;
+      pushLog(game, `점혈 — 초식의 기가 막혀 피해 ${cut}이(가) 줄어듭니다.`);
+      if (!game.enemyHitReduceAll) game.enemyHitReduce = 0;
+    }
     if (game.bossWeakenActive) {
       dmg = Math.round(dmg * 0.75); // 자 '부식장'
       game.bossWeakenActive = false;
@@ -337,7 +376,10 @@ const TS_Engine = (() => {
     game.playerBlock -= absorbed;
     game.playerHp -= dmg - absorbed;
     const hit = { hp: dmg - absorbed, absorbed };
-    if (game.stats) game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
+    if (game.stats) {
+      game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
+      game.stats.damageTaken += dmg - absorbed;
+    }
 
     // 반격 (백 '반탄강기') — 이번 적 페이즈의 매 피격마다 돌려준다.
     // 소모되지 않고, 다음 내 합이 시작될 때 사라진다.
@@ -580,10 +622,15 @@ const TS_Engine = (() => {
 
     // 검(劍) · 파일럿 계열 (ideanote/017-2) — 끝까지 이은 합을 보상한다.
     // 이어 온 연계와 미리 채운 연계도 센다 — 둘 다 계열 자원이다.
+    // 파일럿 1.5 검-1: 합이 끝날 때가 아니라 합 중 **한 번이라도** 닿았으면.
+    // 마무리 · 봉인이 연계를 비워도 이미 닿은 수는 인정한다.
     const finaleLinks = weaponSum(game, 'finaleLinks');
-    if (finaleLinks && chainLinks(game) >= finaleLinks) {
+    // finaleAtEnd는 검-2(끝날 때 네 수)를 재 보려는 비교용 손잡이다 — 데이터에는 없다.
+    const reached = hasWeapon(game, 'finaleAtEnd')
+      ? chainLinks(game) : Math.max(game.maxLinksThisTurn || 0, chainLinks(game));
+    if (finaleLinks && reached >= finaleLinks) {
       const dmg = weaponSum(game, 'finaleDamage');
-      pushLog(game, `검(劍) — ${chainLinks(game)}수를 이어 마감. 추가 피해 ${dmg}.`);
+      pushLog(game, `검(劍) — 이번 합에 ${reached}수까지 이었습니다. 추가 피해 ${dmg}.`);
       applyDamageToBoss(game, dmg);
       pushFx(game, 'playerAttack', {
         amount: dmg, hp: game.lastHit.hp, absorbed: game.lastHit.absorbed, label: '검(劍)',
@@ -647,13 +694,24 @@ const TS_Engine = (() => {
     }
 
     let effectiveDamage = card.damage + discardBonus;
+    // 연환각성 (파일럿 1.5) — 연계 · 마무리의 수당만 올린다. 이은 수는 그대로.
+    const perLinkBoost = sumEffectAmount(game, 'CHAIN_BOOST');
     // 연계 (적) — 이번 턴에 "이미" 사용한 카드 수만큼 가산. cardsPlayedThisTurn은
     // 이 아래에서 증가하므로 자기 자신은 세지 않는다.
     if (card.chain) {
       const links = chainLinks(game);
-      const bonus = card.chain * links;
+      const bonus = (card.chain + perLinkBoost) * links;
       effectiveDamage += bonus;
       if (bonus > 0) pushLog(game, `연계 ${links}장 — 추가 피해 ${bonus}.`);
+    }
+    // 마무리 (파일럿 1.5) — 지금까지 이은 수로 한 방을 만들고 연계를 비운다.
+    // 비우는 건 피해를 계산한 뒤다(아래 clearLinks).
+    let finisherLinks = null;
+    if (card.finisher) {
+      finisherLinks = chainLinks(game);
+      const bonus = (card.finisher + perLinkBoost) * finisherLinks;
+      effectiveDamage += bonus;
+      pushLog(game, `마무리 — ${finisherLinks}수를 모아 추가 피해 ${bonus}.`);
     }
     // 일격 (적 B라인) — 지금 남은 버퍼가 깊을수록 강하다. 연계가 "나중에
     // 낼수록 강함"이라면 일격은 "먼저 낼수록 강함"이라, 같은 합 안에서
@@ -724,7 +782,10 @@ const TS_Engine = (() => {
 
     if (card.hpCost) {
       game.playerHp -= card.hpCost;
-      if (game.stats) game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
+      if (game.stats) {
+        game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
+        game.stats.hpBurned += card.hpCost;
+      }
       pushLog(game, `[${card.name}] — 체력 ${card.hpCost} 소모.`);
     }
     if (effectiveDamage > 0) {
@@ -737,12 +798,44 @@ const TS_Engine = (() => {
       if (card.lifesteal) {
         const healed = healPlayer(game, Math.round(dealt * card.lifesteal / 100));
         if (healed > 0) pushLog(game, `흡혈 — 체력 +${healed}.`);
+        // 마교의 대가 (파일럿 1.5 C-3) — 흡성 초식의 막타는 최대 체력을 되찾는다
+        if (card.faction === 'demonic' && game.bossHp <= 0) game.drainKill = true;
       }
     } else {
       pushLog(game, `[${card.name}] 사용.`);
     }
     const blockGain = (card.block || 0)
       + (card.chainBlock ? card.chainBlock * chainLinks(game) : 0);
+    // 바꾼다 (사파, 파일럿 1.5 D-1) — 드로우는 연계를 비우지 않는다.
+    if (card.chainDraw) {
+      const n = Math.min(card.chainDrawCap || 99, Math.floor(chainLinks(game) / card.chainDraw));
+      if (n > 0) {
+        drawCards(game, n);
+        game.cardDrawsThisTurn += n;
+        if (game.stats) game.stats.chainDrawn += n;
+        pushLog(game, `연계 ${chainLinks(game)}수를 패로 바꿉니다 — 카드 ${n}장.`);
+      }
+    }
+    // 봉인은 연계를 비우고, 비운 1수당 적의 다음 초식 피해를 깎는다.
+    if (card.chainSeal) {
+      const links = chainLinks(game);
+      const cut = card.chainSeal * links;
+      if (cut > 0) {
+        game.enemyHitReduce += cut;
+        if (card.sealAll) game.enemyHitReduceAll = true;
+        if (game.stats) game.stats.sealPlays += 1;
+        pushLog(game, `점혈 — 연계 ${links}수를 봉인으로 바꿉니다. 적의 ${card.sealAll ? '이번 반격 모든' : '다음'} 초식 피해 -${game.enemyHitReduce}.`);
+      }
+      clearLinks(game);
+    }
+    if (finisherLinks !== null) {
+      if (game.stats) { game.stats.finisherPlays += 1; game.stats.finisherLinks += finisherLinks; }
+      clearLinks(game);
+    }
+    if (card.bossExpose) {
+      game.bossVulnerableActive = true;
+      pushLog(game, '사혈을 드러냅니다 — 이번 합 동안 적이 받는 피해 +50%.');
+    }
     if (blockGain > 0) {
       game.playerBlock += blockGain;
       pushLog(game, `방어도 +${blockGain}.`);
@@ -834,6 +927,10 @@ const TS_Engine = (() => {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'BOSS_VULNERABLE_AURA' });
       pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 적 받는 피해 +${p.amount}%.`);
+    } else if (card.effect === 'PERSISTENT_CHAIN_BOOST') {
+      const p = card.persistentPayload;
+      addOrRefreshEffect(game, { ...p, kind: 'CHAIN_BOOST' });
+      pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 연계 · 마무리 수당 +${p.amount}.`);
     } else if (card.effect === 'PERSISTENT_HEAL_ON_TURN_START') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'HEAL_ON_TURN_START' });
@@ -842,6 +939,7 @@ const TS_Engine = (() => {
 
     // 콤보 드로우 (gdd/07 7-3)
     game.cardsPlayedThisTurn += 1;
+    game.maxLinksThisTurn = Math.max(game.maxLinksThisTurn || 0, chainLinks(game));
     game.comboCounter += 1;
     if (game.comboCounter >= D.COMBO_THRESHOLD) {
       game.comboCounter -= D.COMBO_THRESHOLD;

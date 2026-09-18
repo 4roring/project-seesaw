@@ -508,15 +508,16 @@ const TS_DATA = {
       // 한 번도 안 터진다(0.00). +3에서 4색 × 300런 평균 5.05로 다섯과 붙는다.
       bareFist: 3,
     },
-    // 파일럿 (ideanote/017-2) — 검·도 계열의 검. 연계를 끝까지 이으면 보상한다
-    // (순방향). 도(刀)가 같은 연계를 역방향으로 읽으므로 계열 안 두 무기가
+    // 파일럿 (ideanote/017-2) — 검·도 계열의 검. 연계를 길게 이으면 보상한다
+    // (순방향). 파일럿 1.5부터 검-1: 합 중 한 번이라도 네 수에 닿으면 인정한다 —
+    // 마무리가 연계를 비워도 검 보상이 남도록. 도(刀)가 같은 연계를 역방향으로 읽으므로 계열 안 두 무기가
     // 정면으로 맞선다. lineageOnly라 4문파 런의 선택지·제안에는 나오지 않는다.
     // 4문파의 검(sword, 착지)은 건드리지 않는다 — 017은 착지를 창으로 옮기지만
     // 그건 창·곤 파일럿(순서 2)의 일이다.
     blade_sword: {
       key: 'blade_sword', name: '검(劍)', icon: '🗡', lineageOnly: 'BLADE',
       flavor: '끊기지 않는 검로가 곧 검의 격이다.',
-      rule: '한 합에 네 수 이상 이어(이어 온 연계 포함) 선을 넘기면 적에게 피해 6',
+      rule: '한 합에 연계가 한 번이라도 네 수에 닿으면(이어 온 연계 포함) 선을 넘길 때 적에게 피해 6',
       finaleLinks: 4, finaleDamage: 6,
     },
   },
@@ -765,27 +766,18 @@ TS_DATA.GLOSSARY = [
 
 
 // ─────────────────────────────────────────────────────────────
-// 파일럿 — 무기 계열 (ideanote/017, 순서 1: 검·도 × 정파 / 마교)
+// 파일럿 1.5 — 무기 계열 (ideanote/017 · drafts/017-pilot-1.5)
+//   검·도 × 정파 / 사파 / 마교. 계열 카드 새로 · 마무리 · 시작 부스터 · 오의.
 //
 // 지금 4문파 데모와 **나란히** 둔다. 합격 기준을 재기 전에는 gdd에 올리지
 // 않는다 (ideanote/00-README "노트 → 파일럿 → 졸업"). 여기 수치와 이름은
-// 데모 세션이 정한 첫 값이고, 검증 결과는 017 끝에 남긴다.
+// 초안의 가안이고, 초안이 비워 둔 자리는 데모 세션이 정한 첫 값이다.
+// 검증 결과는 017 끝에 남긴다.
 // ─────────────────────────────────────────────────────────────
 (() => {
   const D = TS_DATA;
-
-  // 계열 20장은 적(화산)의 연계 재료를 옮겨 쓴다 (017-2). 같은 key를 쓰면
-  // 강화표가 그대로 따라오고, 수치를 두 곳에 적지 않아도 된다.
-  // 일격(deepStrike)은 옮기지 않는다 — 버퍼 깊이는 창·곤의 "간격" 재료다.
-  const RED = [...D.STARTER_DECKS.RED, ...Object.values(D.REWARD_POOLS.RED).flat()];
-  const from = (key, rarity, patch) => {
-    const base = RED.find((c) => c.key === key);
-    if (!base) throw new Error(`파일럿 계열 카드의 원본이 없습니다: ${key}`);
-    const extra = typeof patch === 'function' ? patch(base) : (patch || {});
-    const c = { ...base, ...extra, rarity, lineage: 'BLADE' };
-    delete c.count;
-    return c;
-  };
+  const card = (key, name, rarity, cost, fields) =>
+    ({ key, name, cost, damage: 0, block: 0, ...fields, rarity, lineage: 'BLADE' });
 
   D.LINEAGES_ENABLED = true;
   D.LINEAGES = {
@@ -796,65 +788,79 @@ TS_DATA.GLOSSARY = [
     },
   };
 
-  // 세력은 자원이 없고 동사만 있다 (017-1). 이름표와 동사만 둔다.
+  // 세력은 자원이 없고 동사만 있다 (017-3). 셋이 같은 연계를 나눠 쓴다 —
+  // 정파는 남기고(chainKeep), 사파는 팔고(chainSeal · chainDraw), 마교는 당겨 쓴다(chainPrime).
   D.FACTIONS = {
     orthodox: { key: 'orthodox', name: '정파', verb: '쌓는다', icon: '☯' },
+    heterodox: { key: 'heterodox', name: '사파', verb: '바꾼다', icon: '狼' },
     demonic: { key: 'demonic', name: '마교', verb: '태운다', icon: '血' },
   };
+  D.FACTION_ORDER = ['orthodox', 'heterodox', 'demonic'];
 
-  // 시작 덱 10장 — 기본 타격·방어 + 계열 고유 2장 (017-4). 150장에 세지 않는다.
+  // 시작 덱 10장 — 기본 8 + 계열 고유 2 (초안 A). 전향 부스터는 기본 8장만 바꾼다.
   //
-  // 고유 2장은 연계의 마무리(매화만개)와 무거운 한 수(파옥일섬). 처음에는
-  // 연환매화·기수응세(값싼 연계 둘)를 넣었더니 탐욕 정책 300런 중 200런이
-  // 1스테이지에서 죽었다(도달 2.6) — 기본 8장으로는 90 체력을 못 깎는다.
+  // 초안 값(유수 틈1·피해3·연계5 / 뇌정 틈2·피해8·마무리6)은 초안이 둔 하한
+  // (파일럿 1의 초심자 4.2 · 탐욕 8.6) 아래로 떨어져 고쳤다. 부스터 무작위,
+  // 초심자 · 탐욕 300런 × 3:
   //
-  //   시작 덱 (300런)                       초심자  탐욕
-  //   타5×4 · 방6×4 · 연환매화 · 기수응세     2.5    2.6
-  //   타5×4 · 방6×4 · 매화만개 · 파옥일섬     3.7    8.8
-  //   타6×4 · 방6×4 · 매화만개 · 파옥일섬     4.2    8.6   ← 지금
-  //   타7×4 · 방7×4 · 매화만개 · 연환매화     3.3    9.5
-  //   (참고) 적(화산) 시작 덱 그대로          5.7    9.8
-  //   (기준) 4문파 적(화산)                   5.0    9.7
+  //   고유 2장                                  초심자  탐욕  탐욕 3스테이지 사망
+  //   (기준) 파일럿 1 — 매화만개 · 파옥일섬       3.73   8.77    67
+  //   초안  유수 1·3·연5 / 뇌정 2·8·마6           3.1    6.2    264
+  //         유수 1·5·연6 / 뇌정 3·12·마7          3.30   8.33   109
+  //         유수 1·5·연6 / 뇌정 2·4·마10          3.70   7.17   187
+  //   지금  유수 1·5·연6 / 뇌정 3·4·마11          4.97   8.70    75
   //
-  // 초심자가 4문파보다 0.8 낮은 것은 모양 탓이다 — 적의 시작 덱은 기본이 아닌
-  // 초식이 다섯 장인데 017-4의 모양은 두 장이다. 수치로 메우지 않고 017에 남긴다.
-  const red = (key, count) => ({ ...RED.find((c) => c.key === key), count });
+  // 두 가지를 배웠다.
+  // 1. 틈 합이 줄면 3스테이지(철벽 무승, 빈틈 9)에서 무너진다 — 두 장의 틈 합이
+  //    5 → 3이 되자 파훼를 못 냈다. 뇌정일섬을 틈 3으로 되돌렸다.
+  // 2. **마무리는 기본 피해가 낮아야 한다.** 초심자는 큰 숫자부터 내므로, 기본
+  //    피해 12짜리 마무리를 이은 수 0에서 먼저 썼다. 기본 4 · 수당 11이면 기본
+  //    초식(피해 6)을 먼저 내고 마무리를 뒤에 쓴다 — 초심자 3.3 → 5.0.
   D.LINEAGE_STARTER = {
     BLADE: [
-      { key: 'blade_strike', name: '기본검세', cost: 1, damage: 6, block: 0, count: 4 },
-      { key: 'blade_guard', name: '기본방세', cost: 1, damage: 0, block: 6, count: 4 },
-      red('chain_burst', 1),
-      red('breakthrough', 1),
+      { key: 'blade_strike', name: '평수일참', cost: 1, damage: 6, block: 0, count: 4, basic: true },
+      { key: 'blade_guard', name: '거산수세', cost: 1, damage: 0, block: 6, count: 4, basic: true },
+      { key: 'blade_flow', name: '유수연격', cost: 1, damage: 5, block: 0, chain: 6, count: 1 },
+      { key: 'blade_thunder', name: '뇌정일섬', cost: 3, damage: 4, block: 0, finisher: 11, count: 1 },
     ],
   };
 
-  // 계열 고유 20장 — 일반 9 · 고급 8 · 희귀 3 (017-4)
+  // 계열 20장 — 일반 9 · 고급 8 · 희귀 3. 화산파 이름을 뺐고, 연계와 무관한 카드가 없다.
   D.LINEAGE_POOL = {
     BLADE: [
-      from('rapid_slash', 1), from('chain_wall', 1), from('counter_rage', 1),
-      from('flame_edge', 1), from('ignite', 1), from('double_load', 1),
-      from('breakthrough', 1), from('focus', 1), from('heat_vent', 1),
+      card('ln_gale_cut', '질풍연참', 1, 1, { damage: 4, chain: 3 }),
+      card('ln_cloud_guard', '유운방신', 1, 1, { block: 2, chainBlock: 4 }),
+      card('ln_step_advance', '연보진격', 1, 1, { damage: 3, chain: 2, effect: 'REDUCE_NEXT_COST' }),
+      card('ln_reverse_counter', '역수반격', 1, 2, { damage: 6, chainBlock: 3 }),
+      card('ln_decisive_flash', '결전일섬', 1, 2, { damage: 5, finisher: 4 }),
+      card('ln_light_step', '경신보법', 1, 1, { chainBlock: 2, draw: 1 }),
+      card('breakthrough', '파옥일섬', 1, 2, { damage: 9, effect: 'REDUCE_NEXT_COST' }),
+      card('focus', '축기결', 1, 1, { effect: 'DOUBLE_NEXT_ATTACK' }),
+      card('ln_mist_hands', '운무연수', 1, 1, { damage: 3, block: 2, chain: 3 }),
 
-      from('chain_burst', 2), from('chain_storm', 2), from('flame_combo', 2),
-      from('option_crackshot', 2), from('option_warmup', 2), from('blaze_dance', 2),
-      from('heat_armor', 2),
-      // '폭혈운기'는 마교의 피 이미지라 계열 공용 이름으로 바꿔 쓴다
-      from('tamer_overdrive', 2, (b) => ({
-        name: '심법: 검기운용',
-        persistentPayload: { ...b.persistentPayload, name: '검기운용' },
-      })),
+      card('ln_thunder_chain', '뇌명연환', 2, 3, { damage: 8, chain: 9 }),
+      card('ln_chain_storm', '연환폭풍', 2, 3, { damage: 8, chain: 5 }),
+      card('ln_mountain_break', '산악붕격', 2, 2, { damage: 4, finisher: 6 }),
+      card('ln_gale_dance', '질풍난무', 2, 3, { damage: 6, chain: 7, draw: 1 }),
+      card('ln_iron_chain', '철벽연환', 2, 3, { damage: 8, block: 10, chainBlock: 6 }),
+      card('ln_qi_guard', '운기연방', 2, 2, { damage: 9, chainBlock: 4 }),
+      card('ln_chain_awaken', '심법: 연환각성', 2, 2, {
+        effect: 'PERSISTENT_CHAIN_BOOST',
+        persistentPayload: { id: 'aura-chain-boost', name: '연환각성', amount: 2, turns: 3 },
+      }),
+      card('ln_chain_crash', '연쇄붕격', 2, 2, { damage: 5, chain: 3, effect: 'REDUCE_NEXT_COST' }),
 
-      from('final_chain', 3), from('chain_finale', 3), from('decisive', 3),
+      card('ln_myriad_swords', '만검귀종', 3, 5, { damage: 20, chain: 10 }),
+      card('ln_heaven_thunder', '천뢰일섬', 3, 4, { damage: 12, finisher: 10 }),
+      card('ln_sky_sever', '일검단천', 3, 6, { damage: 24, finisher: 12 }),
     ],
   };
 
-  // 세력 하이브리드 — "(계열 자원)을 (세력 동사)한다" (017-1). 세력마다 일반 4 ·
-  // 고급 3 · 희귀 2, 그리고 궁극기 1은 따로 (017-4).
+  // 세력 하이브리드 — "(계열 자원)을 (세력 동사)한다" (017-3). 세력마다 일반 4 · 고급 3 · 희귀 2.
   const tag = (faction) => (c) => ({ ...c, faction });
   D.FACTION_POOL = {
     BLADE: {
-      // 정파 — 쌓는다. 이은 수가 합을 넘어 남고, 방어와 함께 간다 (017-3).
-      // chainKeep N: 이번 합에 이은 수 중 N수까지 다음 합으로 넘긴다.
+      // 정파 — 쌓는다. chainKeep N: 이번 합에 이은 수 중 N수까지 다음 합으로 넘긴다.
       orthodox: [
         { key: 'orth_heart_blade', name: '정심일검', cost: 1, damage: 4, block: 3, chainKeep: 1, rarity: 1 },
         { key: 'orth_guard_seal', name: '호체수결', cost: 1, damage: 0, block: 6, chainKeep: 1, rarity: 1 },
@@ -866,14 +872,24 @@ TS_DATA.GLOSSARY = [
         { key: 'orth_great_river', name: '대하장강', cost: 3, damage: 9, block: 0, chain: 7, chainKeep: 3, rarity: 3 },
         { key: 'orth_mountain_qi', name: '태산정기', cost: 3, damage: 0, block: 12, chainBlock: 4, chainKeep: 3, rarity: 3 },
       ].map(tag('orthodox')),
-      // 마교 — 태운다. HP를 내고 이을 수를 미리 채우며, 흡성으로 되찾는다 (017-3).
-      // chainPrime N: 지금 합의 연계를 N수 미리 채운다 (그 합에서 끝난다).
-      //
-      // 흡성은 처음 값의 0.6배, HP 소모는 +2다. 처음 값에서는 흡성이 소모를 넘게
-      // 되메워, 순수 마교가 순수 정파보다 클리어 72% 대 45%로 앞서고 최저 HP도
-      // 더 높았다(59% 대 54%). 이 값에서 53% 대 45%, 도달 9.4 대 9.3.
-      // ⚠️ 최저 HP는 어느 값에서도 정파보다 안 내려갔다(흡성 ×0.45 · HP +2까지
-      // 56~59%) — 마교가 빨리 끝내 덜 맞는 몫이 태우는 몫보다 크다. 017에 남긴다.
+      // 사파 — 바꾼다 (초안 D). chainSeal N: 연계를 비우고, 비운 1수당 적의 다음
+      // 초식 피해 -N. chainDraw N: 이은 수 N당 1장 뽑는다(비우지 않는다).
+      // 틈으로의 환전은 넣지 않는다 — gdd/11-5의 되감기 루프 위험.
+      heterodox: [
+        { key: 'het_acupoint', name: '점혈수법', cost: 1, damage: 3, block: 0, chainSeal: 2, rarity: 1 },
+        { key: 'het_shadow_throw', name: '암영투척', cost: 1, damage: 5, block: 0, bossWeaken: true, rarity: 1 },
+        { key: 'het_night_raid', name: '야습연환', cost: 1, damage: 3, block: 0, chain: 2, chainDraw: 3, rarity: 1 },
+        { key: 'het_rob_hand', name: '파적탈수', cost: 2, damage: 7, block: 0, chainDraw: 2, rarity: 1 },
+        { key: 'het_full_seal', name: '전신점혈', cost: 2, damage: 4, block: 0, chainSeal: 4, rarity: 2 },
+        { key: 'het_black_wind', name: '흑풍탈백', cost: 2, damage: 6, block: 0, chainDraw: 2, bossExpose: true, rarity: 2 },
+        { key: 'het_ambush', name: '산림매복', cost: 3, damage: 9, block: 6, chainSeal: 3, rarity: 2 },
+        // "적 다음 합 초식 하나를 통째로 지움"은 이미 있는 점혈(sealSkill)로 둔다
+        { key: 'het_myriad_seal', name: '만혈봉쇄', cost: 4, damage: 0, block: 0, chainSeal: 8, sealSkill: 2, rarity: 3 },
+        // "그만큼 다음 합 틈 -1"은 새 층 규칙이라, 다음 초식 틈 -1로 좁힌다
+        { key: 'het_greenwood', name: '녹림겁략', cost: 3, damage: 6, block: 0, chainDraw: 1, chainDrawCap: 3, effect: 'REDUCE_NEXT_COST', rarity: 3 },
+      ].map(tag('heterodox')),
+      // 마교 — 태운다. chainPrime N: HP를 내고 지금 합의 연계를 N수 미리 채운다.
+      // 흡성 · HP 소모는 파일럿 1의 조정값(흡성 ×0.6, 소모 +2) 그대로.
       demonic: [
         { key: 'dem_blood_seal', name: '혈인연수', cost: 1, damage: 4, block: 0, hpCost: 5, chainPrime: 2, rarity: 1 },
         { key: 'dem_drain_blade', name: '흡정검결', cost: 1, damage: 5, block: 0, chain: 2, lifesteal: 21, rarity: 1 },
@@ -888,42 +904,74 @@ TS_DATA.GLOSSARY = [
     },
   };
 
-  // 궁극기 — 계열 3 × 세력 3 = 9장 중 파일럿 2장 (017-5).
-  // 016은 "2막 보스(16/30스테이지)"에 줬다. 10스테이지 데모에서는 같은 자리인
-  // 5스테이지 클리어 전리품을 궁극기로 바꾼다. 런에 하나(unique).
-  // 덱에 그 세력 초식이 fullAt장 이상이면 full 값으로 싸운다 (전투를 시작할 때 판정).
+  // 오의(奧義) — 세력당 2장 (초안 C-2). 5스테이지 클리어 전리품을 대신한다.
+  // 무작위 3장 중 1장, 덱에 없는 세력 것도 나온다. 완전 조건은 없다.
+  // 정기만리 · 천마혈겁은 파일럿 1의 "완전" 값에서 출발한다. 나머지 넷은 데모 세션이 정했다.
+  //
+  // 한 장씩만 후보로 두고 잰 값 (비급 두 권 고정, 최선 정책, 탐욕 300런 × 3):
+  //   오의 없음 8.13 · 정기만리 8.67 · 천마혈겁 8.57
+  //   새 넷 첫 값 → 올린 값: 청천백일 8.00 → 8.23 · 천지점혈 8.27 → 8.43
+  //                          녹림혈맹 8.07 → 8.17 · 혈마강림 8.30 → 8.67
+  // 오의 한 장은 덱 19장 중 한 장이고 다섯 비무에만 든다 — 장 사이 차이 0.3은
+  // 이 표본의 노이즈와 같아 더 가르지 않았다.
+  const ult = (faction, c) => ({ block: 0, damage: 0, ...c, faction, ultimate: true, unique: true });
   D.ULTIMATE_STAGE = 5;
-  D.ULTIMATE_FULL_AT = 5;
+  D.ULTIMATE_CHOICES = 3;
   D.ULTIMATES = {
-    BLADE: {
-      orthodox: {
-        key: 'orth_ultimate', name: '정기만리', cost: 4, damage: 12, block: 8, chain: 8, chainKeep: 3,
-        faction: 'orthodox', ultimate: true, unique: true, fullAt: 5,
-        full: { chain: 12, block: 12, chainKeep: 5 },
-      },
-      demonic: {
-        key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, block: 0, chain: 10, hpCost: 8, chainPrime: 4,
-        faction: 'demonic', ultimate: true, unique: true, fullAt: 5,
-        full: { chain: 14, lifesteal: 30 },
-      },
-    },
+    BLADE: [
+      ult('orthodox', { key: 'orth_ultimate', name: '정기만리', cost: 4, damage: 12, block: 12, chain: 12, chainKeep: 5 }),
+      ult('orthodox', { key: 'orth_ultimate2', name: '청천백일', cost: 3, damage: 16, block: 14, chainBlock: 3, chainKeep: 4 }),
+      // 사파 천지점혈 — 초안의 "봉인 12"는 수당 12면 네 수에 한 합 -48이라, 한 적 페이즈
+      // 전체에 수당으로 읽는다(수당 4, 네 수면 -16).
+      ult('heterodox', { key: 'het_ultimate', name: '천지점혈', cost: 4, damage: 20, chainSeal: 4, sealAll: true }),
+      // 녹림혈맹 — "이번 비무 동안 뽑은 초식 틈 -1"은 새 층 규칙이라 다음 초식 틈 -1로 좁힌다
+      ult('heterodox', { key: 'het_ultimate2', name: '녹림혈맹', cost: 3, damage: 20, chain: 6, chainDraw: 1, chainDrawCap: 5, effect: 'REDUCE_NEXT_COST' }),
+      // 천마혈겁 — 연계 +10을 마무리 +12로 (초안 C-2 "태워서 터뜨린다")
+      ult('demonic', { key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, hpCost: 8, chainPrime: 4, finisher: 12, lifesteal: 30 }),
+      ult('demonic', { key: 'dem_ultimate2', name: '혈마강림', cost: 3, damage: 12, hpCost: 8, chainPrime: 6, chain: 7, lifesteal: 20 }),
+    ],
   };
 
-  // 출신 — 시작 유물 하나, 유물 세 칸 밖 (017-5). 선대의 유산은 저장과 함께(순서 6).
-  D.ORIGIN_FACTION_WEIGHT = 2;
-  D.ORIGINS = [
-    { key: 'orth_disciple', name: '정파 속가제자', icon: '🏯', faction: 'orthodox',
-      desc: '정파 무공이 전리품에 두 배로 자주 보입니다.' },
-    { key: 'demon_remnant', name: '마교 잔당', icon: '🩸', faction: 'demonic',
-      desc: '마교 무공이 전리품에 두 배로 자주 보입니다.' },
-    { key: 'veteran', name: '강호 경험', icon: '🎒', veteran: true,
-      desc: '나서기 전에 전리품을 한 번 고릅니다 (3장 중 1장).' },
-    { key: 'two_manuals', name: '비급 두 권', icon: '📜', manuals: 2,
+  // 마교의 대가 (초안 C-3) — 한 비무에서 HP 소모로 태운 합계 10당 최대 체력 -1,
+  // 마교 흡성 초식으로 적을 쓰러뜨리면 최대 체력 +2.
+  D.BURN_PER_MAXHP = 10;
+  D.DRAIN_KILL_MAXHP = 2;
+
+  // 시작 부스터 — 매 판 무작위 3개 중 1개 (초안 C-1). 파일럿 1의 출신 다섯을 대체한다.
+  // 유물 세 칸과 별도다. 최대 체력 부스터는 넣지 않는다(파일럿 1에서 늘 앞섰다).
+  D.BOOSTER_CHOICES = 3;
+  D.BOOSTER_FACTION_WEIGHT = 2;
+  const FN = { orthodox: '정파', heterodox: '사파', demonic: '마교' };
+  D.BOOSTERS = [
+    { key: 'orth_disciple', name: '정파 속가제자', icon: '🏯', kind: '세력', favor: 'orthodox', factionPick: 'orthodox',
+      desc: '정파 초식 · 오의가 두 배로 자주 보입니다. 나서기 전에 정파 초식 3장 중 1장을 고릅니다.' },
+    { key: 'het_ties', name: '녹림의 연줄', icon: '🌲', kind: '세력', favor: 'heterodox', factionPick: 'heterodox',
+      desc: '사파 초식 · 오의가 두 배로 자주 보입니다. 나서기 전에 사파 초식 3장 중 1장을 고릅니다.' },
+    { key: 'dem_remnant', name: '마교 잔당', icon: '🩸', kind: '세력', favor: 'demonic', factionPick: 'demonic',
+      desc: '마교 초식 · 오의가 두 배로 자주 보입니다. 나서기 전에 마교 초식 3장 중 1장을 고릅니다.' },
+    ...['orthodox', 'heterodox', 'demonic'].map((f) => ({
+      key: `${f}_secret`, name: { orthodox: '정파 사문의 비전', heterodox: '녹림의 맹세', demonic: '마교 혈서' }[f],
+      icon: { orthodox: '📘', heterodox: '📗', demonic: '📕' }[f], kind: '세력', ultGuarantee: f,
+      desc: `오의를 배울 때 ${FN[f]} 오의가 반드시 후보에 듭니다.`,
+    })),
+    ...['orthodox', 'heterodox', 'demonic'].map((f) => ({
+      key: `${f}_convert`, name: `${FN[f]} 입문`, icon: D.FACTIONS[f].icon, kind: '전향', convert: f,
+      desc: `기본 초식 8장(평수일참 · 거산수세)을 ${FN[f]} 일반 초식으로 바꿉니다. 계열 고유 2장은 남습니다.`,
+    })),
+    { key: 'deep_qi', name: '내공 심후', icon: '🌀', kind: '능력', minReturn: 1,
+      desc: '적 페이즈가 끝나면 기세가 최소 아4로 돌아옵니다 (보통 아3).' },
+    { key: 'quick_hand', name: '쾌수', icon: '✋', kind: '능력', extraHand: 1,
+      desc: '비무마다 시작 손패가 한 장 많습니다.' },
+    { key: 'trained', name: '수련의 흔적', icon: '🔨', kind: '강화', upgrades: 3,
+      desc: '덱의 초식 3장을 강화한 채 시작합니다 (무작위).' },
+    { key: 'guard_array', name: '호신진', icon: '🛡', kind: '진법', opening: 'guard',
+      desc: '비무마다 첫 2합, 합이 시작될 때 방어도 +5.' },
+    { key: 'break_array', name: '파공진', icon: '💥', kind: '진법', opening: 'break',
+      desc: '비무마다 첫 2합, 적이 받는 피해 +15%.' },
+    { key: 'veteran', name: '강호 경험', icon: '🎒', kind: '기타', veteranPicks: 2,
+      desc: '나서기 전에 무작위 초식 3장 중 2장을 거둡니다.' },
+    { key: 'two_manuals', name: '비급 두 권', icon: '📜', kind: '기타', manuals: 2,
       desc: '구결 두 권을 들고 나섭니다. 수련장에서 한 걸음씩 들여야 익혀집니다.' },
-    // 017은 "영약"이라 불렀지만 기연 영약(대가 있음)과 이름이 겹친다 — 017이
-    // "이름은 나중에 가린다"고 남겼으므로 데모에서 가린다.
-    { key: 'life_pill', name: '보명단', icon: '💊', maxHp: 10,
-      desc: '최대 체력 +10. 적의 큰 초식 한 대만큼 여유가 생깁니다.' },
   ];
 
   // 희귀도 확률 — 슬더스 값에서 출발 (017-4). 계열 런은 막으로 풀을 막지 않는다.
@@ -931,10 +979,22 @@ TS_DATA.GLOSSARY = [
 
   Object.assign(D.UPGRADES, {
     blade_strike: { damage: 8 }, blade_guard: { block: 9 },
+    blade_flow: { chain: 8 }, blade_thunder: { finisher: 14 },
+    ln_gale_cut: { chain: 6 }, ln_cloud_guard: { chainBlock: 8 }, ln_step_advance: { chain: 4 },
+    ln_reverse_counter: { chainBlock: 5 }, ln_decisive_flash: { finisher: 6 }, ln_light_step: { draw: 2 },
+    ln_mist_hands: { chain: 5 },
+    ln_thunder_chain: { chain: 13 }, ln_chain_storm: { chain: 8 }, ln_mountain_break: { finisher: 8 },
+    ln_gale_dance: { chain: 9 }, ln_iron_chain: { chainBlock: 8 }, ln_qi_guard: { chainBlock: 6 },
+    ln_chain_awaken: { persistentPayload: { id: 'aura-chain-boost', name: '연환각성', amount: 3, turns: 3 } },
+    ln_chain_crash: { chain: 5 },
+    ln_myriad_swords: { chain: 13 }, ln_heaven_thunder: { finisher: 13 }, ln_sky_sever: { finisher: 15 },
     orth_heart_blade: { damage: 6, block: 4 }, orth_guard_seal: { block: 9 },
     orth_blue_cloud: { chain: 5 }, orth_flow_palm: { damage: 10 },
     orth_true_link: { chain: 7 }, orth_head_tail: { block: 12 }, orth_cloud_dragon: { chain: 6 },
     orth_great_river: { chain: 9 }, orth_mountain_qi: { block: 16 },
+    het_acupoint: { chainSeal: 3 }, het_shadow_throw: { damage: 7 }, het_night_raid: { chain: 4 },
+    het_rob_hand: { damage: 10 }, het_full_seal: { chainSeal: 5 }, het_black_wind: { damage: 9 },
+    het_ambush: { block: 9 }, het_myriad_seal: { chainSeal: 10 }, het_greenwood: { damage: 9 },
     dem_blood_seal: { chainPrime: 3 }, dem_drain_blade: { damage: 7 }, dem_reverse_vein: { chainPrime: 4 },
     dem_soul_cut: { chain: 6 }, dem_blood_chain: { chain: 7 }, dem_mad_chain: { rageScale: 3 },
     dem_soul_palm: { damage: 12 }, dem_blood_sea: { chain: 8 }, dem_devil_drain: { chain: 9 },

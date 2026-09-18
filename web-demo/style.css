@@ -766,10 +766,13 @@ button:hover { border-color: var(--text-dim); }
 .card.BLADE .card-cost { background: #b8643a; }
 .card.f-orthodox { box-shadow: inset 0 -3px 0 #5aa0d0; }
 .card.f-demonic { box-shadow: inset 0 -3px 0 #b04a8a; }
+.card.f-heterodox { box-shadow: inset 0 -3px 0 #5aa070; }
 .card.full { border-color: var(--break); }
 
 .origin-card.fac-orthodox:hover { border-color: #5aa0d0; }
 .origin-card.fac-demonic:hover { border-color: #b04a8a; }
+.origin-card.fac-heterodox:hover { border-color: #5aa070; }
+.booster-kind { font-size: 10px; color: var(--text-dim); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0 5px; margin-left: 4px; vertical-align: middle; }
 
 /* 전리품 이름표 — 희귀도는 테두리로, 세력은 칩으로 */
 .rc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
@@ -782,6 +785,7 @@ button:hover { border-color: var(--text-dim); }
 .rar-chip.rar-ult { color: #ffb3ad; border-color: #a04a40; }
 .fac-chip.fac-orthodox { color: #8cc8f0; border-color: #3a6a88; }
 .fac-chip.fac-demonic { color: #e090c8; border-color: #804070; }
+.fac-chip.fac-heterodox { color: #90d8a0; border-color: #3a7048; }
 .reward-card.rar-2 { border-color: #3a6a88; }
 .reward-card.rar-3 { border-color: #8a7020; }
 .reward-card.rar-ult { border-color: #a04a40; box-shadow: 0 0 0 1px #a04a40 inset; }
