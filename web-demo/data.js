@@ -520,6 +520,28 @@ const TS_DATA = {
       rule: '한 합에 연계가 한 번이라도 네 수에 닿으면(이어 온 연계 포함) 선을 넘길 때 적에게 피해 6',
       finaleLinks: 4, finaleDamage: 6,
     },
+    // 파일럿 2 (drafts/017-pilot-2 B-1) — 창·곤 계열. 둘은 **같은 깊이를
+    // 반대로** 읽는다. 017-2의 "계열 안 두 무기는 같은 자원을 반대로 읽는다"를
+    // 간격 축에서 반복한 것이다.
+    //
+    // ❗ 노트는 곤을 "간격을 남긴 채 넘기면"으로 적었지만, 합은 기세가 0을
+    // 초과해야 끝나므로 **넘기는 순간 간격은 반드시 0**이다. 그 상태가 없다.
+    // 그래서 둘 다 "초식을 낼 때의 깊이"로 읽는다.
+    //
+    // 4문파의 창(spear, 무거운 초식 +12)과 곤(staff, 방어도 남기면 반환 +1)은
+    // 그대로 둔다 — 파일럿은 4문파를 건드리지 않는다.
+    pole_spear: {
+      key: 'pole_spear', name: '창(槍)', icon: '🔱', lineageOnly: 'POLE',
+      flavor: '창은 거리를 먼저 재고 나서 찌른다.',
+      rule: '간격이 아3 이상일 때 낸 초식은 피해 +4',
+      gapDeepBonus: 4,
+    },
+    pole_staff: {
+      key: 'pole_staff', name: '곤(棍)', icon: '🪵', lineageOnly: 'POLE',
+      flavor: '봉은 품에 들어온 상대를 마다하지 않는다.',
+      rule: '간격이 아1 이하일 때 낸 초식은 방어도 +4',
+      gapNearBlock: 4,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────
@@ -776,8 +798,14 @@ TS_DATA.GLOSSARY = [
 // ─────────────────────────────────────────────────────────────
 (() => {
   const D = TS_DATA;
-  const card = (key, name, rarity, cost, fields) =>
-    ({ key, name, cost, damage: 0, block: 0, ...fields, rarity, lineage: 'BLADE' });
+  const mk = (lineage) => (key, name, rarity, cost, fields) =>
+    ({ key, name, cost, damage: 0, block: 0, ...fields, rarity, lineage });
+  const card = mk('BLADE');   // 검·도 (파일럿 1.5)
+  const pcard = mk('POLE');   // 창·곤 (파일럿 2)
+
+  // 창(槍) · 곤(棍)이 깊이를 읽는 경계 (drafts/017-pilot-2 B-1).
+  D.GAP_DEEP_AT = 3;  // 창 — 이 칸 이상이면 찔러 넣는다
+  D.GAP_NEAR_AT = 1;  // 곤 — 이 칸 이하면 버틴다
 
   D.LINEAGES_ENABLED = true;
   D.LINEAGES = {
@@ -785,6 +813,11 @@ TS_DATA.GLOSSARY = [
       key: 'BLADE', name: '검·도', sect: '무명의 강호인', icon: '⚔', pilot: true,
       desc: '한 합에 이어 친 수를 모아 무거운 한 수로 마무리하는 계열. 세력은 정해지지 않는다',
       weapons: ['blade_sword', 'saber'],
+    },
+    POLE: {
+      key: 'POLE', name: '창·곤', sect: '무명의 강호인', icon: '🔱', pilot: true,
+      desc: '내 쪽에 남은 기세 깊이를 간격으로 삼아 찌르고 되받는 계열. 세력은 정해지지 않는다',
+      weapons: ['pole_spear', 'pole_staff'],
     },
   };
 
@@ -823,6 +856,19 @@ TS_DATA.GLOSSARY = [
       { key: 'blade_flow', name: '유수연격', cost: 1, damage: 5, block: 0, chain: 6, count: 1 },
       { key: 'blade_thunder', name: '뇌정일섬', cost: 3, damage: 4, block: 0, finisher: 11, count: 1 },
     ],
+    // 창·곤 (파일럿 2) — 기본 8 + 계열 고유 2. 기본 8장은 LINEAGE_STARTER가
+    // 계열별이라 장병기 이름으로 따로 둔다.
+    //
+    // 점강자의 기본 피해를 7로 잡은 이유: **찌르기는 기본 피해가 높아야 한다.**
+    // 마무리와 정반대다. 초심자는 큰 숫자부터 내는데, 찌르기는 합의 앞쪽에서
+    // 내야 간격이 깊다. 기본 공격(6)보다 커야 먼저 나간다 — 6 이하면 뒤로
+    // 밀려 간격을 못 쓴다 (drafts/017-pilot-2 A-4).
+    POLE: [
+      { key: 'pole_strike', name: '중평창', cost: 1, damage: 6, block: 0, count: 4, basic: true },
+      { key: 'pole_guard', name: '횡소방신', cost: 1, damage: 0, block: 6, count: 4, basic: true },
+      { key: 'pole_pierce', name: '점강자', cost: 1, damage: 7, block: 0, deepStrike: 3, count: 1 },
+      { key: 'pole_return', name: '회마창', cost: 2, damage: 5, block: 0, rewind: 1, count: 1 },
+    ],
   };
 
   // 계열 20장 — 일반 9 · 고급 8 · 희귀 3. 화산파 이름을 뺐고, 연계와 무관한 카드가 없다.
@@ -853,6 +899,36 @@ TS_DATA.GLOSSARY = [
       card('ln_myriad_swords', '만검귀종', 3, 5, { damage: 20, chain: 10 }),
       card('ln_heaven_thunder', '천뢰일섬', 3, 4, { damage: 12, finisher: 10 }),
       card('ln_sky_sever', '일검단천', 3, 6, { damage: 24, finisher: 12 }),
+    ],
+    // 창·곤 20장 — 일반 9 · 고급 8 · 희귀 3.
+    // 역할: 찌르기(깊이를 피해로) · 되받기(깊이를 되산다) · 흘리기(계열 경감)
+    // · 틈 조절 · 지속. 되받기는 전부 `cost - rewind >= 1`이다 (gdd/11-5).
+    POLE: [
+      pcard('pl_snake_seek', '발초심사', 1, 1, { damage: 5, deepStrike: 3 }),
+      pcard('pl_cloud_sweep', '소운봉', 1, 1, { block: 5 }),
+      pcard('pl_step_back', '퇴보세', 1, 2, { block: 6, rewind: 1 }),
+      pcard('pl_snake_tongue', '백사토신', 1, 1, { damage: 6, deepStrike: 2, effect: 'REDUCE_NEXT_COST' }),
+      pcard('pl_coil', '반룡세', 1, 1, { block: 2, evade: 1 }),
+      pcard('pl_point_way', '선인지로', 1, 1, { damage: 4, effect: 'REDUCE_NEXT_COST' }),
+      pcard('pl_iron_broom', '철소추', 1, 1, { damage: 7 }),
+      pcard('pl_sea_probe', '탐해세', 1, 2, { damage: 8, deepStrike: 3 }),
+      pcard('pl_sky_point', '조천세', 1, 2, { damage: 4, rewind: 1, draw: 1 }),
+
+      pcard('pl_yaksha', '야차탐해', 2, 2, { damage: 9, deepStrike: 6 }),
+      pcard('pl_pear_spear', '이화창', 2, 2, { damage: 6, deepStrike: 4, draw: 1 }),
+      pcard('pl_wind_return', '회풍반타', 2, 3, { damage: 10, rewind: 2 }),
+      pcard('pl_heaven_earth', '봉타건곤', 2, 2, { block: 10, evade: 1 }),
+      pcard('pl_golden_stand', '금계독립', 2, 2, { block: 6, rewind: 1 }),
+      pcard('pl_cloud_cut', '횡운단봉', 2, 3, { damage: 12, deepStrike: 4 }),
+      pcard('pl_long_art', '심법: 장병세', 2, 2, {
+        effect: 'PERSISTENT_GAP_BOOST',
+        persistentPayload: { id: 'aura-gap-boost', name: '장병세', amount: 1, turns: 3 },
+      }),
+      pcard('pl_long_snake', '일자장사', 2, 2, { damage: 7, rewind: 1, effect: 'REDUCE_NEXT_COST' }),
+
+      pcard('pl_crush', '만균압정', 3, 4, { damage: 18, deepStrike: 9 }),
+      pcard('pl_sky_fall', '천붕지열', 3, 5, { damage: 26, deepStrike: 6 }),
+      pcard('pl_tornado', '용권풍', 3, 4, { damage: 14, rewind: 3, evade: 1 }),
     ],
   };
 
@@ -902,6 +978,49 @@ TS_DATA.GLOSSARY = [
         { key: 'dem_devil_drain', name: '마검흡혈', cost: 3, damage: 12, block: 0, chain: 7, lifesteal: 21, rarity: 3 },
       ].map(tag('demonic')),
     },
+    // 창·곤 — 같은 세 동사가 자원만 갈아탄다 (drafts/017-pilot-2 D).
+    //   정파 gapKeep N : 이번 합에 되산 칸 중 N칸까지 다음 합 최소 반환에 더한다
+    //   사파 gapSell N : 지금 간격에서 최대 N칸을 비우고 1칸당 보상(sell*)
+    //   마교 gapPrime N: 체력(hpCost)을 태워 N칸 되산다 — 합당 1회
+    POLE: {
+      orthodox: [
+        { key: 'orth_hold_pole', name: '지간세', cost: 1, damage: 0, block: 5, gapKeep: 1, rarity: 1 },
+        { key: 'orth_true_spear', name: '정종창법', cost: 1, damage: 5, block: 0, gapKeep: 1, rarity: 1 },
+        { key: 'orth_guard_back', name: '수세반격', cost: 2, damage: 6, block: 4, gapKeep: 1, rarity: 1 },
+        { key: 'orth_safe_step', name: '보신퇴보', cost: 2, damage: 0, block: 7, rewind: 1, gapKeep: 1, rarity: 1 },
+        { key: 'orth_long_river', name: '장강대하', cost: 2, damage: 7, block: 0, deepStrike: 3, gapKeep: 2, rarity: 2 },
+        { key: 'orth_cloud_coil', name: '운중반룡', cost: 2, damage: 0, block: 9, evade: 1, gapKeep: 2, rarity: 2 },
+        { key: 'orth_center_art', name: '심법: 수중세', cost: 2, damage: 0, block: 0, gapKeep: 1,
+          effect: 'PERSISTENT_BLOCK_ON_TURN_START',
+          persistentPayload: { id: 'aura-block-on-turn', name: '수중세', amount: 4, turns: 3 }, rarity: 2 },
+        { key: 'orth_tai_press', name: '태산압란', cost: 3, damage: 14, block: 0, deepStrike: 4, gapKeep: 3, rarity: 3 },
+        { key: 'orth_true_qi', name: '천강정기', cost: 3, damage: 0, block: 12, rewind: 2, gapKeep: 3, rarity: 3 },
+      ].map(tag('orthodox')),
+      heterodox: [
+        { key: 'het_dark_shop', name: '흑점창', cost: 1, damage: 3, block: 0, gapSell: 2, sellDamage: 4, rarity: 1 },
+        { key: 'het_green_pole', name: '녹림봉', cost: 1, damage: 0, block: 3, gapSell: 2, sellBlock: 4, rarity: 1 },
+        { key: 'het_night_step', name: '야행보', cost: 1, damage: 0, block: 0, evade: 1, gapSell: 1, sellBlock: 3, draw: 1, rarity: 1 },
+        { key: 'het_bone_spear', name: '투골창', cost: 2, damage: 7, block: 0, gapSell: 1, sellDamage: 5, rarity: 1 },
+        { key: 'het_ruin_pole', name: '파가봉', cost: 2, damage: 0, block: 0, gapSell: 3, sellDamage: 6, rarity: 2 },
+        { key: 'het_windfall', name: '횡재세', cost: 2, damage: 0, block: 0, gapSell: 3, sellBlock: 5, draw: 1, rarity: 2 },
+        { key: 'het_ambush_pole', name: '암습봉', cost: 2, damage: 9, block: 0, evade: 1, gapSell: 2, sellDamage: 5, rarity: 2 },
+        { key: 'het_fortune', name: '일확천금', cost: 3, damage: 0, block: 0, gapSell: 6, sellDamage: 9, rarity: 3 },
+        { key: 'het_sell_self', name: '매신계', cost: 2, damage: 0, block: 0, gapSell: 6, sellHeal: 4, draw: 1, rarity: 3 },
+      ].map(tag('heterodox')),
+      demonic: [
+        { key: 'dem_blood_step', name: '혈보퇴', cost: 1, damage: 4, block: 0, hpCost: 3, gapPrime: 1, rarity: 1 },
+        { key: 'dem_devil_pierce', name: '마창자', cost: 1, damage: 6, block: 0, hpCost: 3, gapPrime: 1, rarity: 1 },
+        { key: 'dem_drain_pole', name: '흡혈봉', cost: 2, damage: 7, block: 0, hpCost: 3, gapPrime: 1, lifesteal: 35, rarity: 1 },
+        { key: 'dem_blood_cloud', name: '혈운보', cost: 2, damage: 0, block: 6, hpCost: 3, gapPrime: 1, rarity: 1 },
+        { key: 'dem_blood_spear', name: '혈마창', cost: 2, damage: 8, block: 0, hpCost: 6, gapPrime: 2, deepStrike: 4, rarity: 2 },
+        { key: 'dem_blood_art', name: '심법: 혈기장병', cost: 2, damage: 0, block: 0, hpCost: 8,
+          effect: 'PERSISTENT_GAP_BOOST',
+          persistentPayload: { id: 'aura-gap-boost', name: '혈기장병', amount: 2, turns: 3 }, rarity: 2 },
+        { key: 'dem_blood_return', name: '역혈반타', cost: 3, damage: 12, block: 0, hpCost: 3, rewind: 2, gapPrime: 1, rarity: 2 },
+        { key: 'dem_blood_abyss', name: '혈해심연', cost: 3, damage: 16, block: 0, hpCost: 9, gapPrime: 3, deepStrike: 8, rarity: 3 },
+        { key: 'dem_burn_spear', name: '분혈창', cost: 2, damage: 0, block: 0, hpCost: 9, gapPrime: 3, draw: 1, rarity: 3 },
+      ].map(tag('demonic')),
+    },
   };
 
   // 오의(奧義) — 세력당 2장 (초안 C-2). 5스테이지 클리어 전리품을 대신한다.
@@ -930,6 +1049,15 @@ TS_DATA.GLOSSARY = [
       ult('demonic', { key: 'dem_ultimate', name: '천마혈겁', cost: 5, damage: 16, hpCost: 8, chainPrime: 4, finisher: 12, lifesteal: 30 }),
       ult('demonic', { key: 'dem_ultimate2', name: '혈마강림', cost: 3, damage: 12, hpCost: 8, chainPrime: 6, chain: 7, lifesteal: 20 }),
     ],
+    // 창·곤 오의 6장 (파일럿 2 E) — 세력당 2, 완전 조건 없음.
+    POLE: [
+      ult('orthodox', { key: 'orth_pole_ult', name: '태산불이', cost: 2, damage: 14, block: 20, rewind: 1, gapKeep: 5 }),
+      ult('orthodox', { key: 'orth_pole_ult2', name: '장병제세', cost: 3, damage: 16, gapKeep: 4, deepStrike: 6, block: 10 }),
+      ult('heterodox', { key: 'het_pole_ult', name: '건곤일척', cost: 3, damage: 10, gapSell: 6, sellDamage: 14 }),
+      ult('heterodox', { key: 'het_pole_ult2', name: '도중환골', cost: 2, damage: 0, gapSell: 6, sellHeal: 7, sellBlock: 6, draw: 2 }),
+      ult('demonic', { key: 'dem_pole_ult', name: '혈해창생', cost: 1, damage: 8, hpCost: 12, gapPrime: 5, draw: 2 }),
+      ult('demonic', { key: 'dem_pole_ult2', name: '천마일창', cost: 3, damage: 24, hpCost: 6, deepStrike: 12, lifesteal: 30 }),
+    ],
   };
 
   // 마교의 대가 (초안 C-3) — 한 비무에서 HP 소모로 태운 합계 10당 최대 체력 -1,
@@ -956,7 +1084,7 @@ TS_DATA.GLOSSARY = [
     })),
     ...['orthodox', 'heterodox', 'demonic'].map((f) => ({
       key: `${f}_convert`, name: `${FN[f]} 입문`, icon: D.FACTIONS[f].icon, kind: '전향', convert: f,
-      desc: `기본 초식 8장(평수일참 · 거산수세)을 ${FN[f]} 일반 초식으로 바꿉니다. 계열 고유 2장은 남습니다.`,
+      desc: `기본 초식 8장을 ${FN[f]} 일반 초식으로 바꿉니다. 계열 고유 2장은 남습니다.`,
     })),
     { key: 'deep_qi', name: '내공 심후', icon: '🌀', kind: '능력', minReturn: 1,
       desc: '적 페이즈가 끝나면 기세가 최소 아4로 돌아옵니다 (보통 아3).' },
@@ -980,6 +1108,20 @@ TS_DATA.GLOSSARY = [
   Object.assign(D.UPGRADES, {
     blade_strike: { damage: 8 }, blade_guard: { block: 9 },
     blade_flow: { chain: 8 }, blade_thunder: { finisher: 14 },
+    // 창·곤 (파일럿 2). ⚠️ **되감기(rewind)를 올리는 강화는 금지**한다 —
+    // `cost - rewind`가 0이 되면 강화 한 번으로 11-5의 영구기관이 생긴다.
+    // 되받기 카드의 강화는 피해 · 방어도로만 준다 (drafts/017-pilot-2 F-2).
+    pole_strike: { damage: 8 }, pole_guard: { block: 9 },
+    pole_pierce: { deepStrike: 4 }, pole_return: { damage: 8 },
+    pl_snake_seek: { deepStrike: 4 }, pl_cloud_sweep: { block: 8 },
+    pl_step_back: { block: 9 }, pl_snake_tongue: { deepStrike: 3 },
+    pl_coil: { block: 5 }, pl_point_way: { damage: 7 }, pl_iron_broom: { damage: 10 },
+    pl_sea_probe: { deepStrike: 4 }, pl_sky_point: { damage: 7 },
+    pl_yaksha: { deepStrike: 9 }, pl_pear_spear: { deepStrike: 8 },
+    pl_wind_return: { damage: 14 }, pl_heaven_earth: { block: 14 },
+    pl_golden_stand: { block: 10 }, pl_cloud_cut: { deepStrike: 8 },
+    pl_long_snake: { damage: 11 }, pl_crush: { deepStrike: 12 },
+    pl_sky_fall: { damage: 32 }, pl_tornado: { damage: 20 },
     ln_gale_cut: { chain: 6 }, ln_cloud_guard: { chainBlock: 8 }, ln_step_advance: { chain: 4 },
     ln_reverse_counter: { chainBlock: 5 }, ln_decisive_flash: { finisher: 6 }, ln_light_step: { draw: 2 },
     ln_mist_hands: { chain: 5 },

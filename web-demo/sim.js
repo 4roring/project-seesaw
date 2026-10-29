@@ -65,8 +65,24 @@ window.TS_Sim = (() => {
     if (c.chainSeal) v += Math.min(c.sealAll ? 30 : 12, c.chainSeal * links(g)) * (c.sealAll ? 1.5 : 1);
     if (c.chainDraw) v += Math.min(c.chainDrawCap || 99, Math.floor(links(g) / c.chainDraw)) * 4;
     if (c.bossExpose) v += 5;
+    // 파일럿 2 (창·곤) — 간격은 "지금 깊이"다. 매도는 깊이가 얕으면 값이
+    // 줄어드는 것까지 그대로 본다(실제로 min(N, 깊이)만 팔린다).
+    const gap = Math.max(0, -g.gauge);
+    // 판 칸은 **기세를 쓰는 비용**이다 — 틈과 똑같이 합을 끝으로 밀므로
+    // 분모에 넣어야 한다. 안 넣으면 AI가 매도를 공짜로 보고 사파로 쏠린다.
+    let soldCost = 0;
+    if (c.gapSell) {
+      const sold = Math.min(c.gapSell, gap);
+      soldCost = sold;
+      v += sold * ((c.sellDamage || 0) + (c.sellBlock || 0) + (c.sellHeal || 0));
+    }
+    // 남긴다: 다음 합의 깊이 1칸은 초식 한 장을 더 낼 여유쯤이다.
+    if (c.gapKeep) v += c.gapKeep * 3;
+    // 산다: 지금 깊이를 곧바로 늘린다 — 되감기와 같은 자로 잰다.
+    if (c.gapPrime) v += c.gapPrime * 3;
     v -= (c.hpCost || 0) * 0.8;
-    return v / Math.max(0.5, cost(g, c));
+    // 산 칸은 반대로 비용을 **줄인다** — 틈을 안 쓰고 합을 늘린다.
+    return v / Math.max(0.5, cost(g, c) + soldCost - (c.gapPrime || 0));
   }
 
   const usable = (g, c) => !(c.hpCost && c.hpCost >= g.playerHp);
@@ -398,6 +414,7 @@ window.TS_Sim = (() => {
       finisherPlays: 0, finisherLinks: 0, sealPlays: 0, sealPrevented: 0, chainDrawn: 0,
       damageTaken: 0, hpBurned: 0, maxHpDelta: 0, drainKills: 0, maxHitSum: 0, maxHitTop: 0, wins: 0, maxHits: [],
       boosterPicked: {}, offersNoFaction: 0,
+      gapRewound: 0, gapSold: 0, spear: 0, staff: 0, deepPlays: 0, maxCards: 0,
       deck: { orthodox: 0, heterodox: 0, demonic: 0 }, deckLineage: 0, deckSize: 0 };
     const seenGames = new WeakSet();
     const recordBattle = (g) => {
@@ -414,6 +431,10 @@ window.TS_Sim = (() => {
       lin.finisherPlays += s2.finisherPlays || 0; lin.finisherLinks += s2.finisherLinks || 0;
       lin.sealPlays += s2.sealPlays || 0; lin.sealPrevented += s2.sealPrevented || 0;
       lin.chainDrawn += s2.chainDrawn || 0; lin.damageTaken += s2.damageTaken || 0;
+      lin.gapRewound += s2.gapRewound || 0; lin.gapSold += s2.gapSold || 0;
+      lin.spear += s2.spearFires || 0; lin.staff += s2.staffFires || 0;
+      lin.deepPlays += s2.deepPlays || 0;
+      lin.maxCards = Math.max(lin.maxCards, s2.maxCardsInTurn || 0);
       lin.hpBurned += s2.hpBurned || 0;
       lin.maxHitSum += s2.maxHit || 0; lin.maxHits.push(s2.maxHit || 0); lin.maxHitTop = Math.max(lin.maxHitTop, s2.maxHit || 0);
       if (g.status === 'WON') lin.wins++;
@@ -547,6 +568,12 @@ window.TS_Sim = (() => {
           봉인_합당: +(lin.sealPlays / T).toFixed(2),
           봉인_막은피해_합당: +(lin.sealPrevented / T).toFixed(2),
           연계드로우_합당: +(lin.chainDrawn / T).toFixed(2),
+          되산칸_합당: +(lin.gapRewound / T).toFixed(2),
+          매도칸_합당: +(lin.gapSold / T).toFixed(2),
+          찌르기_합당: +(lin.deepPlays / T).toFixed(2),
+          창_합당: +(lin.spear / T).toFixed(2),
+          곤_합당: +(lin.staff / T).toFixed(2),
+          한합최대초식: lin.maxCards,
           받은피해_합당: +(lin.damageTaken / T).toFixed(2),
           태운HP_런당: +(lin.hpBurned / runs).toFixed(1),
           최대체력_변화_런당: +(lin.maxHpDelta / runs).toFixed(2),
@@ -644,6 +671,25 @@ window.TS_Sim = (() => {
       }
     });
 
+    // 2-b) 강화가 되감기를 올리면 안 된다 (drafts/017-pilot-2 F-2) —
+    //      cost - rewind가 0이 되면 강화 한 번으로 영구기관이 생긴다.
+    Object.entries(D2.UPGRADES || {}).forEach(([key, patch]) => {
+      if (!patch || patch.rewind == null) return;
+      const found = all.find(({ c }) => c.key === key);
+      // 소멸(exhaust) 카드는 11-5의 예외다 — 덱에 다시 섞여 들어오지 않는다.
+      if (found && found.c.exhaust) return;
+      if (!found || found.c.cost - patch.rewind < 1) {
+        problems.push(`강화 ${key}: rewind ${patch.rewind}로 올린다 — 순지출이 1 미만이 된다 (11-5 · 파일럿 2 F-2)`);
+      }
+    });
+    // 2-c) gapPrime은 틈을 쓰지 않고 되감는다. 합당 1회로 막혀 있지만,
+    //      한 장이 되사는 칸이 과하면 그 1회로도 합이 크게 늘어난다.
+    all.forEach(({ col, c, where }) => {
+      if (c.gapPrime && c.gapPrime > 5) {
+        problems.push(`${col} ${where} · ${c.name}: gapPrime ${c.gapPrime} — 한 번에 되사는 칸이 과함(축 최대 6)`);
+      }
+    });
+
     // 3) score()가 0점으로 보는 필드가 있는가 — 빠진 필드는 "버려도 되는
     //    카드"라는 뜻이 되어 교환·보상 통계를 통째로 뒤튼다
     const KNOWN = new Set(['key','name','cost','count','desc','upgraded','unique','exhaust',
@@ -653,7 +699,9 @@ window.TS_Sim = (() => {
       // 파일럿 (ideanote/017) — 이름표 필드와 동사 필드
       'rarity','lineage','faction','ultimate','fullAt','full','isFull','chainKeep','chainPrime',
       // 파일럿 1.5
-      'basic','finisher','chainSeal','sealAll','chainDraw','chainDrawCap','bossExpose']);
+      'basic','finisher','chainSeal','sealAll','chainDraw','chainDrawCap','bossExpose',
+      // 파일럿 2 (창·곤)
+      'gapKeep','gapSell','gapPrime','sellDamage','sellBlock','sellHeal']);
     const unseen = new Set();
     all.forEach(({ c }) => Object.keys(c).forEach((k) => { if (!KNOWN.has(k)) unseen.add(k); }));
     unseen.forEach((k) => problems.push(`점수 함수가 모르는 필드: ${k} — sim.js score()에 넣으세요`));

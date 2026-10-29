@@ -72,6 +72,12 @@ const TS_Engine = (() => {
       chainBank: 0,          // 이번 합의 연계 수에 더해지는 연계 (이어 온 것 + 미리 채운 것)
       chainBankNext: 0,      // 합이 끝날 때 정해져 다음 합으로 넘어가는 연계
       chainKeepThisTurn: 0,  // 이번 합에 '쌓는다' 초식이 남기기로 한 연계의 상한
+      // 간격 (창·곤 계열, ideanote/017-2 · drafts/017-pilot-2) — 자원은 "지금
+      // 내 쪽에 남은 기세 깊이"다. 연계가 쌓이는 자원이면 간격은 줄어드는
+      // 자원이라, 같은 합 안에서 두 계열이 정반대 순서를 요구한다.
+      gapRewoundThisTurn: 0,   // 이번 합에 되받기 · 매수로 되산 칸 누계 (정파가 읽는다)
+      gapKeepThisTurn: 0,      // 이번 합에 '남긴다' 초식이 남기기로 한 칸의 상한
+      gapPrimeUsedThisTurn: false, // 마교 '산다'는 합당 1회 — 11-5 방어선
       // 파일럿 1.5 (ideanote/drafts/017-pilot-1.5) — 연계를 "비우는" 초식(마무리 ·
       // 사파 봉인)이 있다. 이번 합에 낸 장수는 손패 보충과 도(刀)가 따로 읽으므로
       // 지우지 않고, 연계로 세지 않을 앞쪽 장수만 따로 둔다.
@@ -139,6 +145,9 @@ const TS_Engine = (() => {
       // 파일럿 1.5 지표
       finisherPlays: 0, finisherLinks: 0, hpBurned: 0, damageTaken: 0,
       sealPlays: 0, sealPrevented: 0, chainDrawn: 0, maxHit: 0,
+      // 파일럿 2 (창·곤) 지표
+      gapRewound: 0, gapSold: 0, spearFires: 0, staffFires: 0,
+      deepPlays: 0, cardsInTurn: 0, maxCardsInTurn: 0,
     };
     // 시작 부스터의 전투 시작 효과 (진법 · 쾌수) — 런 층이 넘겨준다
     (config.openingEffects || []).forEach((e) => {
@@ -203,6 +212,9 @@ const TS_Engine = (() => {
     game.chainBank = game.chainBankNext || 0;
     game.chainBankNext = 0;
     game.chainKeepThisTurn = 0;
+    game.gapRewoundThisTurn = 0;
+    game.gapKeepThisTurn = 0;
+    game.gapPrimeUsedThisTurn = false;
     game.chainOffset = 0;
     game.maxLinksThisTurn = game.chainBank;
     if (game.stats) {
@@ -640,6 +652,14 @@ const TS_Engine = (() => {
     }
     // 쌓아 둔 연계는 이 합에 실제로 이은 만큼까지만 넘어간다.
     game.chainBankNext = Math.min(chainLinks(game), game.chainKeepThisTurn);
+    // 남긴 간격은 이 합에 실제로 되산 만큼까지만 넘어간다. 위 곤(棍)의
+    // guardReturn이 returnBonusNextTurn을 덮어쓰므로 반드시 그 뒤에 더한다.
+    const gapKept = Math.min(game.gapRewoundThisTurn, game.gapKeepThisTurn);
+    if (gapKept > 0) {
+      game.returnBonusNextTurn += gapKept;
+      pushLog(game, `간격 ${gapKept}칸을 남겼습니다 — 다음 합이 그만큼 깊어집니다.`);
+    }
+    if (game.stats) game.stats.cardsInTurn = 0;
 
     resolveBossPhase(game, n);
     if (checkWinLose(game)) return;
@@ -693,6 +713,20 @@ const TS_Engine = (() => {
       pushLog(game, `연계를 미리 채웁니다 — +${card.chainPrime} (지금 ${chainLinks(game)}수).`);
     }
 
+    // 산다 (마교, 파일럿 2) — 체력(hpCost)을 태워 간격을 되산다. 이 초식 자신의
+    // 찌르기에도 곧바로 들어가도록 피해 계산보다 먼저 둔다 — chainPrime과 같은 자리.
+    // 틈을 쓰지 않고 기세를 되감으므로 11-5의 "틈 0 되감기"와 같은 모양이다.
+    // 합당 1회로 막는다 (drafts/017-pilot-2 F-3).
+    if (card.gapPrime && !game.gapPrimeUsedThisTurn) {
+      const before = game.gauge;
+      game.gauge = Math.max(game.gauge - card.gapPrime, D.GAUGE_MIN);
+      const got = before - game.gauge;
+      game.gapRewoundThisTurn += got;
+      game.gapPrimeUsedThisTurn = true;
+      if (game.stats) game.stats.gapRewound += got;
+      pushLog(game, `피를 태워 간격을 되삽니다 — ${got}칸 (지금 ${gaugeLabel(game.gauge)}).`);
+    }
+
     let effectiveDamage = card.damage + discardBonus;
     // 연환각성 (파일럿 1.5) — 연계 · 마무리의 수당만 올린다. 이은 수는 그대로.
     const perLinkBoost = sumEffectAmount(game, 'CHAIN_BOOST');
@@ -716,11 +750,44 @@ const TS_Engine = (() => {
     // 일격 (적 B라인) — 지금 남은 버퍼가 깊을수록 강하다. 연계가 "나중에
     // 낼수록 강함"이라면 일격은 "먼저 낼수록 강함"이라, 같은 합 안에서
     // 두 라인이 정반대 순서를 요구한다.
+    // 간격을 읽는 셋은 모두 "지금 깊이"를 본다. 순서가 중요하다 —
+    // 찌르고(읽고) → 무기가 읽고 → 판다(쓴다). 매도가 먼저면 자기 피해를 깎는다.
+    const gapDepth = Math.max(0, -game.gauge);
+    let gapBlockBonus = 0;
     if (card.deepStrike) {
-      const depth = Math.max(0, -game.gauge);
-      const bonus = card.deepStrike * depth;
+      const perGap = card.deepStrike + sumEffectAmount(game, 'GAP_BOOST');
+      const bonus = perGap * gapDepth;
       effectiveDamage += bonus;
-      if (bonus > 0) pushLog(game, `일격 — 버퍼 아${depth}만큼 추가 피해 ${bonus}.`);
+      if (game.stats) game.stats.deepPlays += 1;
+      if (bonus > 0) pushLog(game, `찌르기 — 간격 아${gapDepth}만큼 추가 피해 ${bonus}.`);
+    }
+    // 창(槍) · 곤(棍) (파일럿 2) — 같은 깊이를 반대로 읽는다. 창은 깊을 때
+    // 찔러 넣고, 곤은 얕을 때 버틴다. 검(순방향) ↔ 도(역방향)와 같은 모양이
+    // 간격 축에서 반복된다 (017-2 "계열 안 두 무기는 같은 자원을 반대로 읽는다").
+    const spear = weaponSum(game, 'gapDeepBonus');
+    if (spear && gapDepth >= D.GAP_DEEP_AT) {
+      effectiveDamage += spear;
+      if (game.stats) game.stats.spearFires += 1;
+      pushLog(game, `창(槍) — 간격 아${gapDepth}에서 찔러 넣습니다. 추가 피해 ${spear}.`);
+    }
+    const staff = weaponSum(game, 'gapNearBlock');
+    if (staff && gapDepth <= D.GAP_NEAR_AT) {
+      gapBlockBonus += staff;
+      if (game.stats) game.stats.staffFires += 1;
+      pushLog(game, `곤(棍) — 거리가 좁습니다. 방어도 +${staff}.`);
+    }
+    // 판다 (사파, 파일럿 2) — 지금 간격에서 최대 N칸을 비우고(그만큼 기세를
+    // 적 쪽으로), 비운 1칸당 보상을 받는다. 기세를 +로 미는 행위라 합이
+    // **짧아진다** — 11-5의 루프와는 반대 방향이므로 안전하다.
+    let gapSold = 0;
+    if (card.gapSell) {
+      gapSold = Math.min(card.gapSell, gapDepth);
+      if (gapSold > 0) {
+        game.gauge += gapSold;
+        if (game.stats) game.stats.gapSold += gapSold;
+        if (card.sellDamage) effectiveDamage += card.sellDamage * gapSold;
+        pushLog(game, `매도 — 간격 ${gapSold}칸을 팝니다 (지금 ${gaugeLabel(game.gauge)}).`);
+      }
     }
     // 광기 (자 B라인) — 잃은 체력 10당 가산. 흡성(되메우기)과 정반대 방향이라
     // 두 라인이 같은 HP를 놓고 반대로 당긴다.
@@ -805,7 +872,9 @@ const TS_Engine = (() => {
       pushLog(game, `[${card.name}] 사용.`);
     }
     const blockGain = (card.block || 0)
-      + (card.chainBlock ? card.chainBlock * chainLinks(game) : 0);
+      + (card.chainBlock ? card.chainBlock * chainLinks(game) : 0)
+      + gapBlockBonus
+      + (card.sellBlock ? card.sellBlock * gapSold : 0);
     // 바꾼다 (사파, 파일럿 1.5 D-1) — 드로우는 연계를 비우지 않는다.
     if (card.chainDraw) {
       const n = Math.min(card.chainDrawCap || 99, Math.floor(chainLinks(game) / card.chainDraw));
@@ -862,6 +931,18 @@ const TS_Engine = (() => {
     if (card.chainKeep) {
       game.chainKeepThisTurn += card.chainKeep;
       pushLog(game, `연계를 쌓아 둡니다 — 다음 합으로 최대 ${game.chainKeepThisTurn}수.`);
+    }
+    // 남긴다 (정파, 파일럿 2) — 이번 합에 되산 칸 중 이만큼까지를 다음 합의
+    // 최소 반환에 더한다. 되받기는 틈을 순지출하므로 그 자체로는 손해인데,
+    // 정파가 그 손해를 다음 합의 깊이로 돌려준다.
+    if (card.gapKeep) {
+      game.gapKeepThisTurn += card.gapKeep;
+      pushLog(game, `간격을 남겨 둡니다 — 다음 합으로 최대 ${game.gapKeepThisTurn}칸.`);
+    }
+    // 매도로 산 체력
+    if (card.sellHeal && gapSold > 0) {
+      const healed = healPlayer(game, card.sellHeal * gapSold);
+      if (healed > 0) pushLog(game, `매도 — 체력 +${healed}.`);
     }
     // 점혈 (흑 B라인) — 적의 준비된 초식 중 가장 비싼 것을 봉인한다.
     // 클로저가 작아지므로 돌아오는 버퍼도 줄어든다 — 안전을 사는 대신
@@ -931,6 +1012,10 @@ const TS_Engine = (() => {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'CHAIN_BOOST' });
       pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 연계 · 마무리 수당 +${p.amount}.`);
+    } else if (card.effect === 'PERSISTENT_GAP_BOOST') {
+      const p = card.persistentPayload;
+      addOrRefreshEffect(game, { ...p, kind: 'GAP_BOOST' });
+      pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 찌르기 칸당 +${p.amount}.`);
     } else if (card.effect === 'PERSISTENT_HEAL_ON_TURN_START') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'HEAL_ON_TURN_START' });
@@ -953,6 +1038,12 @@ const TS_Engine = (() => {
     if (checkWinLose(game)) return;
 
     // 비용은 오른쪽(+), 되감기는 왼쪽(-) — 합산 결과로 턴 종료를 판정
+    if (card.rewind && game.stats) game.stats.gapRewound += card.rewind;
+    if (card.rewind) game.gapRewoundThisTurn += card.rewind;
+    if (game.stats) {
+      game.stats.cardsInTurn += 1;
+      game.stats.maxCardsInTurn = Math.max(game.stats.maxCardsInTurn, game.stats.cardsInTurn);
+    }
     const rawGauge = game.gauge + effectiveCost - (card.rewind || 0);
     if (rawGauge > 0) {
       const n = Math.min(rawGauge, D.GAUGE_MAX);
