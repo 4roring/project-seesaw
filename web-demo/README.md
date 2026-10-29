@@ -31,8 +31,8 @@ python3 -m http.server 8000
 
 | 규칙 | 문서 |
 | --- | --- |
-| 게이지·턴 교대·자원 반환 | [01](../gdd/01-core-system-gauge.md) |
-| 파훼 — 한 합의 몰아치기가 적의 빈틈을 넘으면 발동 | [02](../gdd/02-boss-intent-thresholds.md) |
+| 기세 축·선(先) 교대·자원 반환 | [01](../gdd/01-core-system-gauge.md) |
+| 파훼 — 한 합의 몰아치기가 적의 빈틈 이상이면 발동 | [02](../gdd/02-boss-intent-thresholds.md) |
 | 적 초식 루프 (오프너/클로저, 클로저 성격, 최소 반환 보장, 인텐트 미리보기) | [08](../gdd/08-boss-skill-loop.md) |
 | 지속 효과(심법/진법), "다음 초식 한 장" 보너스 유지 | [06](../gdd/06-persistent-effects.md) |
 | 숨 고르기(기세→카드), 핸드 유지형 드로우, 연환 드로우 | [07](../gdd/07-turn-economy-revision.md) |
@@ -43,7 +43,7 @@ python3 -m http.server 8000
 | 신병이기 — 한 자루, 규칙을 비트는 무기 6종 | [14](../gdd/14-weapons.md) |
 | 유물 — 자리 3칸, 강호행의 규칙을 비트는 5종 | [15](../gdd/15-relics.md) |
 | 무림 용어·작명·이름 저작권 원칙 | [12](../gdd/12-murim-terms.md) |
-| 4문파·경지·강화 | [11](../gdd/11-card-tiers.md) |
+| 4문파 · 경지 · 강화 | [11](../gdd/11-card-tiers.md) |
 
 UI는 1:1 가로 대전 구도(플레이어 ↔ 적)로, 공격/피격 모션, 스킬명·피해량
 플로팅 표시, 게이지 위로 기세가 떨어지는 연출, 파훼 화면 연출,

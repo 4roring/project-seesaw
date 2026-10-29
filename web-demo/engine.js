@@ -52,7 +52,7 @@ const TS_Engine = (() => {
       // 빈틈 감소는 이번 합에만 남는다. 전투 내내 남기면 파훼가 계단
       // 함수라서(넘거나 못 넘거나) 임계점을 영구히 내리는 카드는 값이
       // 없거나 게임을 끝내거나 둘 중 하나가 된다 — 중간이 없다.
-      // 실측: 백은 이 필드가 있으면 96%, 없으면 2%였다 (gdd/02 2-4).
+      // 실측: 백은 이 필드가 있으면 96%, 없으면 2%였다 (gdd/02 2-3).
       thresholdDownThisTurn: 0,
       closerStyle: enemy.closerStyle || 'DOMINANT', // 패도 | 노회 (gdd/08 8-4-1)
       enemyRealm: enemy.realm || '',

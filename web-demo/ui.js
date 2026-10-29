@@ -257,7 +257,7 @@ const TS_UI = (() => {
     els['boss-badges'].innerHTML = '';
     addBadge(els['boss-badges'], 'block', `방어도 ${g.bossBlock}`, g.bossBlock > 0);
     addBadge(els['boss-badges'], 'power', `공격력 +${g.bossScalingPower}`, g.bossScalingPower > 0);
-    addBadge(els['boss-badges'], 'stun', '기절', g.isBossStunned);
+    addBadge(els['boss-badges'], 'stun', '무너짐', g.isBossStunned);
     addBadge(els['boss-badges'], 'vulnerable', '사혈 노출(파훼)', g.bossVulnerableActive);
     addBadge(els['boss-badges'], 'weaken', '부식(다음 공격 -25%)', g.bossWeakenActive);
     g.activeEffects.filter((e) => e.kind === 'BOSS_VULNERABLE_AURA')

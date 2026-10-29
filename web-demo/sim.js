@@ -583,7 +583,7 @@ window.TS_Sim = (() => {
       cards.forEach((c) => all.push({ col, c, where: '시작 덱' })));
     Object.entries(D2.REWARD_POOLS).forEach(([col, tiers]) =>
       Object.entries(tiers).forEach(([t, cards]) =>
-        cards.forEach((c) => all.push({ col, c, where: `보상 티어${t}` }))));
+        cards.forEach((c) => all.push({ col, c, where: `보상 경지${t}` }))));
     // 파일럿 — 무기 계열 (ideanote/017)
     Object.entries(D2.LINEAGE_STARTER || {}).forEach(([col, cards]) =>
       cards.forEach((c) => all.push({ col, c, where: '계열 시작 덱' })));
