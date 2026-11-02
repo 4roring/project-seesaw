@@ -74,6 +74,25 @@ const TS_UI = (() => {
       { key: 'chainKeep', label: '연계 쌓기', text: (v) => `이은 수 중 ${v}수를 다음 합으로 넘김` },
       { key: 'chainSeal', label: '봉인', text: (v, c) => `봉인 — 연계를 비우고, 비운 1수당 적의 ${c && c.sealAll ? '다음 반격 모든' : '다음'} 초식 피해 -${v}` },
       { key: 'chainDraw', label: '연계 드로우', text: (v, c) => `이은 ${v}수당 카드 1장${c && c.chainDrawCap ? ` (최대 ${c.chainDrawCap}장)` : ''}` },
+      // 파일럿 2 (창·곤) — 간격. 파일럿 2에서 통째로 빠져 있어 사파 · 정파 ·
+      // 마교 창곤 카드가 동사 없이 "방어도 3"처럼만 보였다.
+      { key: 'gapKeep', label: '간격 남기기', text: (v) => `되산 칸 중 ${v}칸을 다음 합의 최소 반환에 더함` },
+      { key: 'gapSell', label: '간격 매도', text: (v) => `간격을 최대 ${v}칸까지 비운다` },
+      { key: 'gapPrime', label: '간격 매수', text: (v) => `피를 태워 간격 ${v}칸을 되산다 (합당 1회)` },
+      // 매도 보상 — 간격 · 강체가 함께 쓴다
+      { key: 'sellDamage', label: '매도 피해', text: (v) => `비운 1칸당 피해 +${v}` },
+      { key: 'sellBlock', label: '매도 방어도', text: (v) => `비운 1칸당 방어도 +${v}` },
+      { key: 'sellHeal', label: '매도 회복', text: (v) => `비운 1칸당 체력 +${v}` },
+      // 파일럿 3 (권·부) — 강체
+      { key: 'hardStance', label: '자세', text: (v) => `이번 적 페이즈에 맞을 때마다 강체 +${(TS_DATA.HARD_PER_HIT || 1) + v}` },
+      { key: 'hardScale', label: '강체 피해', text: (v) => `강체 1당 피해 +${v}` },
+      { key: 'hardBurst', label: '폭발', text: (v) => `폭발 — 강체 1당 피해 +${v}, 그리고 강체를 비움` },
+      { key: 'hardBlock', label: '강체 방어도', text: (v) => `강체 1당 방어도 +${v}` },
+      { key: 'counterScale', label: '강체 반탄', text: (v) => `강체 1당 반탄 +${v}` },
+      { key: 'hardKeep', label: '강체 쌓기', text: (v) => `강체 ${v}만큼을 다음 합으로 넘김` },
+      { key: 'hardPrime', label: '강체 채움', text: (v) => `몸을 미리 굳혀 강체 +${v} (합당 1회)` },
+      { key: 'hardSell', label: '강체 매도', text: (v) => `강체를 최대 ${v}까지 비운다` },
+      { key: 'sellDraw', label: '매도 드로우', text: (v) => `비운 1칸당 카드 ${v}장` },
       { key: 'heal', label: '회복', text: (v) => `체력 ${v} 회복` },
       { key: 'draw', label: '드로우', text: (v) => `카드 ${v}장 드로우` },
       { key: 'rewind', label: '되감기', text: (v) => `기세 ${v} 되감기` },
@@ -99,6 +118,9 @@ const TS_UI = (() => {
       PERSISTENT_BOSS_VULNERABLE: (p) => `${p.turns}합간 적이 받는 피해 +${p.amount}%`,
       PERSISTENT_HEAL_ON_TURN_START: (p) => `${p.turns}합간 합 시작 시 체력 +${p.amount}`,
       PERSISTENT_CHAIN_BOOST: (p) => `${p.turns}합간 연계 · 마무리 수당 +${p.amount}`,
+      // 파일럿 2에서 빠져 있었다 — 심법: 장병세 · 혈기장병이 "효과 없음"으로 보였다
+      PERSISTENT_GAP_BOOST: (p) => `${p.turns}합간 찌르기 칸당 +${p.amount}`,
+      PERSISTENT_HARD_BOOST: (p) => `${p.turns}합간 강체 피해 · 폭발 수당 +${p.amount}`,
     };
 
     function describe(card) {
@@ -273,6 +295,9 @@ const TS_UI = (() => {
     addBadge(els['player-badges'], 'power', `이어 온 연계 ${g.chainBank}수`, g.chainBank > 0);
     addBadge(els['player-badges'], 'block', `다음 합에 연계 ${Math.min(TS_Engine.chainLinks(g), g.chainKeepThisTurn)}수 남김`, g.chainKeepThisTurn > 0);
     addBadge(els['player-badges'], 'power', `지금 연계 ${TS_Engine.chainLinks(g)}수`, !!TS_Run.isLineage(run.color) && TS_Engine.chainLinks(g) > 0);
+    addBadge(els['player-badges'], 'power', `강체 ${g.hardBody}`, g.hardBody > 0);
+    addBadge(els['player-badges'], 'block', `자세 — 맞을 때마다 강체 +${(TS_DATA.HARD_PER_HIT || 1) + g.hardStanceThisTurn}`, g.hardStanceThisTurn > 0);
+    addBadge(els['player-badges'], 'block', `다음 합에 강체 ${Math.min(g.hardBody, g.hardKeepThisTurn)} 남김`, g.hardKeepThisTurn > 0);
     addBadge(els['player-badges'], 'block', `점혈 — 적의 ${g.enemyHitReduceAll ? '모든' : '다음'} 초식 -${g.enemyHitReduce}`, g.enemyHitReduce > 0);
     addBadge(els['player-badges'], 'power', `다음 초식의 틈 -${g.pendingCostReduction}`, g.pendingCostReduction > 0);
     addBadge(els['player-badges'], 'power', `다음 공격 ${g.pendingDamageMultiplier}배`, g.pendingDamageMultiplier > 1);

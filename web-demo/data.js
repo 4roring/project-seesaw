@@ -542,6 +542,22 @@ const TS_DATA = {
       rule: '간격이 아1 이하일 때 낸 초식은 방어도 +4',
       gapNearBlock: 4,
     },
+    // 권(拳) · 부(斧) (파일럿 3) — 같은 강체를 **흩느냐 모으느냐**로 갈린다.
+    // 창 · 곤이 "깊을 때 / 얕을 때"라는 문턱으로 갈렸던 것과 달리, 이쪽은
+    // 양쪽 다 강체 1당으로 읽고 **어느 틈의 초식에 실리는가**가 다르다.
+    // 가벼운 초식이 훨씬 많아 수당 값을 1 : 2로 둔다 (drafts/017-pilot-3 B).
+    fist_hand: {
+      key: 'fist_hand', name: '권(拳)', icon: '👊', lineageOnly: 'FIST',
+      flavor: '주먹은 거리를 재지 않는다. 이미 닿아 있다.',
+      rule: '틈 1의 초식은 강체 1당 피해 +1',
+      fistLightBonus: 1,
+    },
+    fist_axe: {
+      key: 'fist_axe', name: '부(斧)', icon: '🪓', lineageOnly: 'FIST',
+      flavor: '도끼는 한 번 들면 끝까지 내려간다.',
+      rule: '틈 2 이상의 초식은 강체 1당 피해 +2',
+      axeHeavyBonus: 2,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────
@@ -802,10 +818,48 @@ TS_DATA.GLOSSARY = [
     ({ key, name, cost, damage: 0, block: 0, ...fields, rarity, lineage });
   const card = mk('BLADE');   // 검·도 (파일럿 1.5)
   const pcard = mk('POLE');   // 창·곤 (파일럿 2)
+  const fcard = mk('FIST');   // 권·부 (파일럿 3)
 
   // 창(槍) · 곤(棍)이 깊이를 읽는 경계 (drafts/017-pilot-2 B-1).
   D.GAP_DEEP_AT = 3;  // 창 — 이 칸 이상이면 찔러 넣는다
   D.GAP_NEAR_AT = 1;  // 곤 — 이 칸 이하면 버틴다
+
+  // 권(拳) · 부(斧)가 강체를 싣는 틈 경계 (drafts/017-pilot-3 B).
+  // 초안은 권 ≤2 · 부 ≥3이었는데 **부가 안 터졌다** — 계열 63장 중 틈 3 이상이
+  // 아홉 장뿐이고 대부분 고급 · 희귀라, 부만 쥔 런에서 합당 0.04회였다(목표
+  // 0.3~0.8). 경계를 한 칸 내리자 둘 다 범위에 들어온다. 실측(200런, 무기 고정):
+  //
+  //   경계              권만 발동 / 도달    부만 발동 / 도달
+  //   권≤2 · 부≥3        0.72 / 8.7         0.04 / 7.4   ← 부가 죽어 있다
+  //   권≤1 · 부≥2        0.31 / 8.4         0.46 / 8.9
+  //
+  // "권은 흩고 부는 싣는다"는 그대로다 — 권은 틈 1의 잔 주먹(기본 8장이 여기
+  // 있다)에, 부는 틈 2 이상의 내려찍기에 실린다.
+  D.FIST_LIGHT_AT = 1; // 권 — 이 틈 이하면 흩는다
+  D.AXE_HEAVY_AT = 2;  // 부 — 이 틈 이상이면 몰아 싣는다
+  // 피격 1회가 쌓는 강체. **이 한 숫자가 이 계열을 살렸다.**
+  // 1로 두면 강체가 합당 1.88밖에 안 차고, 그러면 강체를 읽는 카드가 합의
+  // 절반에서 죽은 패가 된다 — 도달이 초심자 2.6 · 탐욕 3.4로 무너졌다(3스테이지
+  // 사망 113/150). 수당을 ×2.5까지 올려도 초심자는 3.8에서 안 올라갔다.
+  // 자원을 **크게** 하자 한 번에 풀렸다. 여러 장이 같은 자원을 읽는 계열에서는
+  // 수당이 아니라 자원의 크기가 손잡이다 — 수당은 그 한 장만 세게 하지만
+  // 자원은 그 합에 낸 모든 강체 카드를 한꺼번에 세게 하고, 무엇보다 **자원이
+  // 0인 합을 없앤다**. 실측(150런, 수당 그대로):
+  //
+  //   피격당  초심자  탐욕  계획  탐색  강체  한방 p90  3스테이지 사망
+  //     1      2.6   3.4  3.2   7.9  1.88    —          113
+  //     2      3.7   5.2  5.1   9.0  3.40    —           77
+  //     3      4.6   6.6  6.8   9.3  4.79    75          49
+  //     4      5.2   8.0  8.0   9.8  6.35    82           —
+  //
+  //   (검·도 8.5 · 한방 p90 75 / 최대 191)
+  D.HARD_PER_HIT = 4;
+  // 강체 안전 뚜껑. 자기 증폭 고리는 없다 — 반탄은 적을 때릴 뿐 강체를 주지
+  // 않고, 강체를 주는 피격 횟수는 적의 초식 수로 막혀 있다. 그래서 뚜껑은
+  // **닿지 않는 자리**에 두어야 한다. 10에 두었을 때는 실측 최대가 정확히
+  // 10으로 늘 뚜껑에 닿아, 안전장치가 아니라 숨은 균형 손잡이가 되어 있었다
+  // (자세가 통째로 먹혔다). 24에서는 실측 최대 18로 닿지 않는다.
+  D.HARD_MAX = 24;
 
   D.LINEAGES_ENABLED = true;
   D.LINEAGES = {
@@ -818,6 +872,11 @@ TS_DATA.GLOSSARY = [
       key: 'POLE', name: '창·곤', sect: '무명의 강호인', icon: '🔱', pilot: true,
       desc: '내 쪽에 남은 기세 깊이를 간격으로 삼아 찌르고 되받는 계열. 세력은 정해지지 않는다',
       weapons: ['pole_spear', 'pole_staff'],
+    },
+    FIST: {
+      key: 'FIST', name: '권·부', sect: '무명의 강호인', icon: '👊', pilot: true,
+      desc: '맞은 횟수를 강체로 굳혀 되돌려 주는 계열. 세력은 정해지지 않는다',
+      weapons: ['fist_hand', 'fist_axe'],
     },
   };
 
@@ -868,6 +927,23 @@ TS_DATA.GLOSSARY = [
       { key: 'pole_guard', name: '횡소방신', cost: 1, damage: 0, block: 6, count: 4, basic: true },
       { key: 'pole_pierce', name: '점강자', cost: 1, damage: 7, block: 0, deepStrike: 3, count: 1 },
       { key: 'pole_return', name: '회마창', cost: 2, damage: 5, block: 0, rewind: 1, count: 1 },
+    ],
+    // 권·부 (파일럿 3) — 고유 2장은 **차는 것 하나 · 비우는 것 하나**다.
+    // 앞의 두 계열도 같은 짝이었다(유수연격 · 뇌정일섬 / 점강자 · 회마창).
+    //
+    // 기본 피해 규칙이 앞의 둘과 다르다. 연계는 합 안에서 늘고 간격은 줄지만,
+    // **강체는 직전 적 페이즈에 확정돼 합 안에서 안 변한다**. 그래서 "마무리는
+    // 낮아야"(1.5) · "찌르기는 높아야"(2) 같은 순서 제약이 없다 — 강체 카드는
+    // 합의 어디서 나와도 같은 값이다 (drafts/017-pilot-3 A-4).
+    //
+    // 대신 **합 1에는 강체가 0**이다(앞에 적 페이즈가 없다). 붕산권은 그 합에
+    // 피해 5짜리로, 기본 공격(6)보다 낮아 초심자가 뒤로 미루는데 순서가
+    // 자유로우므로 손해가 아니다.
+    FIST: [
+      { key: 'fist_strike', name: '붕권', cost: 1, damage: 6, block: 0, count: 4, basic: true },
+      { key: 'fist_guard', name: '운수', cost: 1, damage: 0, block: 6, count: 4, basic: true },
+      { key: 'fist_stance', name: '철포삼', cost: 1, damage: 0, block: 4, hardStance: 1, count: 1 },
+      { key: 'fist_burst', name: '붕산권', cost: 2, damage: 5, block: 0, hardBurst: 6, count: 1 },
     ],
   };
 
@@ -929,6 +1005,40 @@ TS_DATA.GLOSSARY = [
       pcard('pl_crush', '만균압정', 3, 4, { damage: 18, deepStrike: 9 }),
       pcard('pl_sky_fall', '천붕지열', 3, 5, { damage: 26, deepStrike: 6 }),
       pcard('pl_tornado', '용권풍', 3, 4, { damage: 14, rewind: 3, evade: 1 }),
+    ],
+    // 권·부 20장 — 일반 9 · 고급 8 · 희귀 3.
+    // 역할: 자세(차는 것) · 읽기(hardScale) · 폭발(hardBurst, 비운다)
+    // · 강체방어(hardBlock) · 반탄(counterScale) · 틈 조절 · 지속.
+    // **되감기가 한 장도 없다** — 이 계열은 기세 축을 직접 만지지 않으므로
+    // gdd/11-5의 영구기관 위험이 파일럿 2보다 훨씬 낮다.
+    // 틈 3 이상은 넷뿐이다(뇌부참 · 쌍부개산 · 패왕붕산 · 개천부) — 부(斧)가
+    // 읽을 자리가 좁은 대신 수당 값이 권의 두 배다 (drafts/017-pilot-3 C-3).
+    FIST: [
+      fcard('fs_horse_fist', '마보충권', 1, 1, { damage: 5, hardScale: 2 }),
+      fcard('fs_iron_palm', '금강수', 1, 1, { block: 4, hardBlock: 3 }),
+      fcard('fs_catch', '접수세', 1, 1, { block: 3, counterScale: 2 }),
+      fcard('fs_split_mt', '벽산수', 1, 2, { damage: 9 }),
+      fcard('fs_stone_arm', '석비수', 1, 1, { damage: 4, hardScale: 1, effect: 'REDUCE_NEXT_COST' }),
+      fcard('fs_brace', '참마세', 1, 1, { block: 2, hardStance: 1 }),
+      fcard('fs_elbow', '주격', 1, 1, { damage: 6 }),
+      fcard('fs_body_slam', '철산고', 1, 2, { damage: 7, hardScale: 2 }),
+      fcard('fs_breath', '조식결', 1, 1, { hardBlock: 2, draw: 1 }),
+
+      fcard('fs_mt_fist', '붕산세', 2, 2, { damage: 6, hardBurst: 5 }),
+      fcard('fs_thunder_axe', '뇌부참', 2, 3, { damage: 12, hardScale: 3 }),
+      fcard('fs_diamond', '금강불괴', 2, 2, { block: 10, hardBlock: 4 }),
+      fcard('fs_counter_armor', '호체반탄', 2, 2, { block: 6, counterScale: 4 }),
+      fcard('fs_double_axe', '쌍부개산', 2, 3, { damage: 10, hardScale: 2, draw: 1 }),
+      fcard('fs_hard_art', '심법: 외공연성', 2, 2, {
+        effect: 'PERSISTENT_HARD_BOOST',
+        persistentPayload: { id: 'aura-hard-boost', name: '외공연성', amount: 2, turns: 3 },
+      }),
+      fcard('fs_deep_stance', '철포삼대성', 2, 2, { block: 5, hardStance: 2 }),
+      fcard('fs_rush_fist', '연환붕권', 2, 2, { damage: 5, hardScale: 2, effect: 'REDUCE_NEXT_COST' }),
+
+      fcard('fs_titan_fist', '패왕붕산', 3, 4, { damage: 16, hardBurst: 9 }),
+      fcard('fs_heaven_axe', '개천부', 3, 5, { damage: 28, hardScale: 4 }),
+      fcard('fs_adamant', '금강역사', 3, 4, { block: 18, hardBlock: 6, counterScale: 5 }),
     ],
   };
 
@@ -1021,6 +1131,54 @@ TS_DATA.GLOSSARY = [
         { key: 'dem_burn_spear', name: '분혈창', cost: 2, damage: 0, block: 0, hpCost: 9, gapPrime: 3, draw: 1, rarity: 3 },
       ].map(tag('demonic')),
     },
+    // 권·부 — 같은 세 동사가 강체로 갈아탄다 (drafts/017-pilot-3 D).
+    //   정파 hardKeep N : 합이 끝날 때 강체를 N까지 다음 합으로 남긴다
+    //   사파 hardSell N : 지금 강체에서 최대 N칸을 비우고 1칸당 보상(sell*)
+    //   마교 hardPrime N: 체력(hpCost)을 태워 강체를 N칸 미리 채운다 — 합당 1회
+    //
+    // ✅ 파일럿 2가 남긴 구조 문제가 여기서 풀린다. 간격은 비우면 **합이
+    // 끝나서** 사파의 "판다"가 성립하지 않았는데, 강체는 기세 축이 아니라
+    // 별도 칸이라 비워도 합이 안 끝난다. 017-3이 권·부의 사파를 "맞은 만큼
+    // 패를 뽑음"으로 적었으므로 보상의 중심을 sellDraw에 둔다.
+    FIST: {
+      orthodox: [
+        { key: 'orth_true_hand', name: '정심수', cost: 1, damage: 4, block: 3, hardKeep: 1, rarity: 1 },
+        { key: 'orth_body_qi', name: '호신강기', cost: 1, damage: 0, block: 6, hardKeep: 1, rarity: 1 },
+        { key: 'orth_root', name: '입지세', cost: 2, damage: 6, block: 4, hardKeep: 1, rarity: 1 },
+        { key: 'orth_immovable', name: '부동명왕', cost: 2, damage: 0, block: 7, hardBlock: 2, hardKeep: 1, rarity: 1 },
+        { key: 'orth_true_fist', name: '정종권법', cost: 2, damage: 7, block: 0, hardScale: 2, hardKeep: 2, rarity: 2 },
+        { key: 'orth_mt_hold', name: '태산부동', cost: 2, damage: 0, block: 9, counterScale: 3, hardKeep: 2, rarity: 2 },
+        { key: 'orth_kong_art', name: '심법: 금강연성', cost: 2, damage: 0, block: 0, hardKeep: 1,
+          effect: 'PERSISTENT_BLOCK_ON_TURN_START',
+          persistentPayload: { id: 'aura-block-on-turn', name: '금강연성', amount: 4, turns: 3 }, rarity: 2 },
+        { key: 'orth_kong_power', name: '금강대력', cost: 3, damage: 14, block: 0, hardScale: 3, hardKeep: 3, rarity: 3 },
+        { key: 'orth_bedrock', name: '만년반석', cost: 3, damage: 0, block: 12, hardBlock: 4, hardKeep: 3, rarity: 3 },
+      ].map(tag('orthodox')),
+      heterodox: [
+        { key: 'het_black_fist', name: '흑시권', cost: 1, damage: 3, block: 0, hardSell: 2, sellDamage: 4, rarity: 1 },
+        { key: 'het_steal_breath', name: '탈기수', cost: 1, damage: 0, block: 0, hardSell: 2, sellDraw: 1, rarity: 1 },
+        { key: 'het_green_axe', name: '녹림부', cost: 1, damage: 0, block: 3, hardSell: 2, sellBlock: 4, rarity: 1 },
+        { key: 'het_foul_fist', name: '음수권', cost: 2, damage: 7, block: 0, hardSell: 1, sellDamage: 5, rarity: 1 },
+        { key: 'het_sell_bruise', name: '매상계', cost: 2, damage: 0, block: 0, hardSell: 3, sellDraw: 1, bossWeaken: true, rarity: 2 },
+        { key: 'het_rob_breath', name: '겁탈수', cost: 2, damage: 6, block: 0, hardSell: 2, sellDamage: 5, bossExpose: true, rarity: 2 },
+        { key: 'het_bandit_axe', name: '산적개부', cost: 2, damage: 9, block: 0, hardSell: 2, sellBlock: 5, rarity: 2 },
+        { key: 'het_sell_all', name: '전신매도', cost: 3, damage: 0, block: 0, hardSell: 6, sellDamage: 9, rarity: 3 },
+        { key: 'het_flesh_trade', name: '혈육거래', cost: 2, damage: 0, block: 0, hardSell: 6, sellHeal: 4, sellDraw: 1, rarity: 3 },
+      ].map(tag('heterodox')),
+      demonic: [
+        { key: 'dem_blood_fist', name: '혈권', cost: 1, damage: 4, block: 0, hpCost: 3, hardPrime: 1, rarity: 1 },
+        { key: 'dem_flesh_hard', name: '혈육강체', cost: 1, damage: 0, block: 4, hpCost: 3, hardPrime: 1, rarity: 1 },
+        { key: 'dem_drain_fist', name: '흡혈권', cost: 2, damage: 7, block: 0, hpCost: 3, hardPrime: 1, lifesteal: 35, rarity: 1 },
+        { key: 'dem_mad_fist', name: '광혈권', cost: 1, damage: 4, block: 0, rageScale: 2, rarity: 1 },
+        { key: 'dem_blood_axe', name: '혈마부', cost: 2, damage: 8, block: 0, hpCost: 6, hardPrime: 2, hardScale: 2, rarity: 2 },
+        { key: 'dem_hard_art', name: '심법: 혈기강체', cost: 2, damage: 0, block: 0, hpCost: 8,
+          effect: 'PERSISTENT_HARD_BOOST',
+          persistentPayload: { id: 'aura-hard-boost', name: '혈기강체', amount: 2, turns: 3 }, rarity: 2 },
+        { key: 'dem_blood_counter', name: '역혈반탄', cost: 2, damage: 6, block: 0, hpCost: 3, counterScale: 4, rarity: 2 },
+        { key: 'dem_abyss_fist', name: '혈해붕권', cost: 3, damage: 14, block: 0, hpCost: 9, hardPrime: 3, hardBurst: 7, rarity: 3 },
+        { key: 'dem_burn_hard', name: '분혈강체', cost: 2, damage: 0, block: 0, hpCost: 9, hardPrime: 3, draw: 1, rageScale: 3, rarity: 3 },
+      ].map(tag('demonic')),
+    },
   };
 
   // 오의(奧義) — 세력당 2장 (초안 C-2). 5스테이지 클리어 전리품을 대신한다.
@@ -1057,6 +1215,15 @@ TS_DATA.GLOSSARY = [
       ult('heterodox', { key: 'het_pole_ult2', name: '도중환골', cost: 2, damage: 0, gapSell: 6, sellHeal: 7, sellBlock: 6, draw: 2 }),
       ult('demonic', { key: 'dem_pole_ult', name: '혈해창생', cost: 1, damage: 8, hpCost: 12, gapPrime: 5, draw: 2 }),
       ult('demonic', { key: 'dem_pole_ult2', name: '천마일창', cost: 3, damage: 24, hpCost: 6, deepStrike: 12, lifesteal: 30 }),
+    ],
+    // 권·부 오의 6장 (파일럿 3 E) — 세력당 2, 완전 조건 없음.
+    FIST: [
+      ult('orthodox', { key: 'orth_fist_ult', name: '부동금강', cost: 2, damage: 14, block: 20, hardBlock: 3, hardKeep: 5 }),
+      ult('orthodox', { key: 'orth_fist_ult2', name: '금강만년', cost: 3, damage: 16, block: 10, hardScale: 4, hardKeep: 4 }),
+      ult('heterodox', { key: 'het_fist_ult', name: '녹림대겁', cost: 3, damage: 12, hardSell: 6, sellDamage: 12, sellDraw: 1 }),
+      ult('heterodox', { key: 'het_fist_ult2', name: '환골매신', cost: 2, damage: 0, hardSell: 6, sellHeal: 7, sellBlock: 6, draw: 2 }),
+      ult('demonic', { key: 'dem_fist_ult', name: '혈마강체', cost: 1, damage: 8, hpCost: 12, hardPrime: 5, draw: 2 }),
+      ult('demonic', { key: 'dem_fist_ult2', name: '천마붕산', cost: 3, damage: 24, hpCost: 6, hardBurst: 12, lifesteal: 30 }),
     ],
   };
 
@@ -1122,6 +1289,37 @@ TS_DATA.GLOSSARY = [
     pl_golden_stand: { block: 10 }, pl_cloud_cut: { deepStrike: 8 },
     pl_long_snake: { damage: 11 }, pl_crush: { deepStrike: 12 },
     pl_sky_fall: { damage: 32 }, pl_tornado: { damage: 20 },
+    // 권·부 (파일럿 3). ⚠️ **자세(hardStance)를 올리는 강화는 금지**한다 —
+    // 자세는 피격 횟수에 곱해지고 그 결과가 다시 폭발 수당에 곱해지므로,
+    // 강화 한 번이 두 번 곱해진다. 자세 카드의 강화는 방어도로만 준다
+    // (drafts/017-pilot-3 F-2).
+    fist_strike: { damage: 8 }, fist_guard: { block: 9 },
+    fist_stance: { block: 7 }, fist_burst: { hardBurst: 8 },
+    fs_horse_fist: { hardScale: 3 }, fs_iron_palm: { hardBlock: 4 },
+    fs_catch: { counterScale: 3 }, fs_split_mt: { damage: 12 },
+    fs_stone_arm: { damage: 6 }, fs_brace: { block: 5 }, fs_elbow: { damage: 9 },
+    fs_body_slam: { hardScale: 3 }, fs_breath: { draw: 2 },
+    fs_mt_fist: { hardBurst: 7 }, fs_thunder_axe: { hardScale: 4 },
+    fs_diamond: { hardBlock: 6 }, fs_counter_armor: { counterScale: 6 },
+    fs_double_axe: { damage: 14 },
+    fs_hard_art: { persistentPayload: { id: 'aura-hard-boost', name: '외공연성', amount: 3, turns: 3 } },
+    fs_deep_stance: { block: 9 }, fs_rush_fist: { hardScale: 3 },
+    fs_titan_fist: { hardBurst: 12 }, fs_heaven_axe: { damage: 36 }, fs_adamant: { hardBlock: 8 },
+    orth_true_hand: { damage: 6, block: 4 }, orth_body_qi: { block: 9 },
+    orth_root: { damage: 9 }, orth_immovable: { block: 10 },
+    orth_true_fist: { hardScale: 3 }, orth_mt_hold: { counterScale: 5 },
+    orth_kong_art: { persistentPayload: { id: 'aura-block-on-turn', name: '금강연성', amount: 6, turns: 3 } },
+    orth_kong_power: { hardScale: 4 }, orth_bedrock: { hardBlock: 6 },
+    het_black_fist: { sellDamage: 6 }, het_steal_breath: { hardSell: 3 },
+    het_green_axe: { sellBlock: 6 }, het_foul_fist: { damage: 10 },
+    het_sell_bruise: { hardSell: 4 }, het_rob_breath: { sellDamage: 7 },
+    het_bandit_axe: { damage: 12 }, het_sell_all: { sellDamage: 12 }, het_flesh_trade: { sellHeal: 6 },
+    dem_blood_fist: { damage: 7 }, dem_flesh_hard: { block: 7 },
+    dem_drain_fist: { damage: 10 }, dem_mad_fist: { rageScale: 4 },
+    dem_blood_axe: { hardScale: 3 },
+    dem_hard_art: { persistentPayload: { id: 'aura-hard-boost', name: '혈기강체', amount: 3, turns: 3 } },
+    dem_blood_counter: { counterScale: 6 }, dem_abyss_fist: { hardBurst: 9 },
+    dem_burn_hard: { rageScale: 5 },
     ln_gale_cut: { chain: 6 }, ln_cloud_guard: { chainBlock: 8 }, ln_step_advance: { chain: 4 },
     ln_reverse_counter: { chainBlock: 5 }, ln_decisive_flash: { finisher: 6 }, ln_light_step: { draw: 2 },
     ln_mist_hands: { chain: 5 },

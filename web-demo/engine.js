@@ -78,6 +78,14 @@ const TS_Engine = (() => {
       gapRewoundThisTurn: 0,   // 이번 합에 되받기 · 매수로 되산 칸 누계 (정파가 읽는다)
       gapKeepThisTurn: 0,      // 이번 합에 '남긴다' 초식이 남기기로 한 칸의 상한
       gapPrimeUsedThisTurn: false, // 마교 '산다'는 합당 1회 — 11-5 방어선
+      // 강체 (권·부 계열, drafts/017-pilot-3) — **내 차례가 아닐 때 차는 첫
+      // 자원**이다. 연계는 합 안에서 늘고 간격은 줄지만, 강체는 직전 적
+      // 페이즈에 확정돼 합 안에서 안 변한다(비우는 초식을 쓸 때만 준다).
+      hardBody: 0,           // 이번 합에 쓸 수 있는 강체
+      hardBodyNext: 0,       // 적 페이즈가 채우는 다음 합의 강체 (+ 정파가 남긴 것)
+      hardStanceThisTurn: 0, // 자세 — 이번 적 페이즈에 피격 1회당 추가로 쌓는 양
+      hardKeepThisTurn: 0,   // 이번 합에 '남긴다' 초식이 남기기로 한 강체의 상한
+      hardPrimeUsedThisTurn: false, // 마교 '산다'는 합당 1회 — gapPrime과 같은 방어선
       // 파일럿 1.5 (ideanote/drafts/017-pilot-1.5) — 연계를 "비우는" 초식(마무리 ·
       // 사파 봉인)이 있다. 이번 합에 낸 장수는 손패 보충과 도(刀)가 따로 읽으므로
       // 지우지 않고, 연계로 세지 않을 앞쪽 장수만 따로 둔다.
@@ -148,6 +156,10 @@ const TS_Engine = (() => {
       // 파일럿 2 (창·곤) 지표
       gapRewound: 0, gapSold: 0, spearFires: 0, staffFires: 0,
       deepPlays: 0, cardsInTurn: 0, maxCardsInTurn: 0,
+      // 파일럿 3 (권·부) 지표. hardAtStart는 "합당 강체"를 재기 위한 것이다 —
+      // 강체가 파훼와 맞서므로(파훼하면 피격 0) 실제로 차는지가 기준 9다.
+      hardAtStart: 0, hardTurns: 0, hardMax: 0, hardKept: 0, hardSold: 0,
+      hardPrimed: 0, hardBurstPlays: 0, stancePlays: 0, fistFires: 0, axeFires: 0,
     };
     // 시작 부스터의 전투 시작 효과 (진법 · 쾌수) — 런 층이 넘겨준다
     (config.openingEffects || []).forEach((e) => {
@@ -217,16 +229,28 @@ const TS_Engine = (() => {
     game.gapPrimeUsedThisTurn = false;
     game.chainOffset = 0;
     game.maxLinksThisTurn = game.chainBank;
+    // 강체 이월 (drafts/017-pilot-3 D-1) — 직전 적 페이즈에 맞은 횟수(+ 정파가
+    // 남긴 것)가 이번 합의 강체다. 방어도 · 반탄과 같은 층이라 합 하나만
+    // 버티고, 자세도 그 페이즈와 함께 끝난다.
+    game.hardBody = Math.min(game.hardBodyNext || 0, D.HARD_MAX);
+    game.hardBodyNext = 0;
+    game.hardStanceThisTurn = 0;
+    game.hardKeepThisTurn = 0;
+    game.hardPrimeUsedThisTurn = false;
     if (game.stats) {
       game.stats.maxTurnDamage = Math.max(game.stats.maxTurnDamage, game.stats.turnDamage);
       game.stats.turnDamage = 0;
       game.stats.carriedLinks += game.chainBank;
       game.stats.carryTurns += 1;
+      game.stats.hardAtStart += game.hardBody;
+      game.stats.hardTurns += 1;
+      game.stats.hardMax = Math.max(game.stats.hardMax, game.hardBody);
     }
     tickActiveEffects(game);
     drawCards(game, refillCount);
     pushLog(game, `--- ${game.turn}합 시작 (기세 ${gaugeLabel(game.gauge)}) ---`);
     if (game.chainBank > 0) pushLog(game, `이어 온 연계 ${game.chainBank}수로 시작합니다.`);
+    if (game.hardBody > 0) pushLog(game, `강체 ${game.hardBody} — 맞은 만큼 몸이 굳어 있습니다.`);
   }
 
   function addOrRefreshEffect(game, { id, name, kind, amount, turns }) {
@@ -392,6 +416,15 @@ const TS_Engine = (() => {
       game.stats.minHp = Math.min(game.stats.minHp, game.playerHp);
       game.stats.damageTaken += dmg - absorbed;
     }
+
+    // 강체 (권·부 계열, drafts/017-pilot-3 A-2) — **맞은 횟수**로 찬다.
+    // 방어도로 전부 막아 낸 피격도 1회로 센다. 017-2가 경감 수단으로 방어도를
+    // 적었으므로 방어도와 강체가 서로 싸우면 안 되고, "맞은 횟수"라는 글자
+    // 그대로이기도 하다. 흘리기로 넘긴 일격은 위에서 먼저 반환되므로 세지
+    // 않는다 — 흘리기는 깎는 게 아니라 통째로 넘기는 것이라(gdd/08 8-4-2)
+    // "맞지 않은" 것이 맞다.
+    game.hardBodyNext = Math.min(
+      game.hardBodyNext + D.HARD_PER_HIT + (game.hardStanceThisTurn || 0), D.HARD_MAX);
 
     // 반격 (백 '반탄강기') — 이번 적 페이즈의 매 피격마다 돌려준다.
     // 소모되지 않고, 다음 내 합이 시작될 때 사라진다.
@@ -659,6 +692,16 @@ const TS_Engine = (() => {
       game.returnBonusNextTurn += gapKept;
       pushLog(game, `간격 ${gapKept}칸을 남겼습니다 — 다음 합이 그만큼 깊어집니다.`);
     }
+    // 강체는 여기서 0이 된다 — 방어도 · 반탄과 같은 층이다(gdd/04 4-1
+    // "둘 다 적 페이즈 하나만 버틴다"). 정파만 그 경계를 넘긴다. 바로 아래
+    // 적 페이즈가 hardBodyNext에 맞은 횟수를 더하므로 반드시 그 전에 더한다.
+    const hardKept = Math.min(game.hardBody, game.hardKeepThisTurn);
+    if (hardKept > 0) {
+      game.hardBodyNext += hardKept;
+      if (game.stats) game.stats.hardKept += hardKept;
+      pushLog(game, `강체 ${hardKept}을(를) 남겼습니다 — 다음 합으로 넘어갑니다.`);
+    }
+    game.hardBody = 0;
     if (game.stats) game.stats.cardsInTurn = 0;
 
     resolveBossPhase(game, n);
@@ -727,6 +770,19 @@ const TS_Engine = (() => {
       pushLog(game, `피를 태워 간격을 되삽니다 — ${got}칸 (지금 ${gaugeLabel(game.gauge)}).`);
     }
 
+    // 산다 (마교, 파일럿 3) — 체력을 태워 강체를 미리 채운다. 적 페이즈를
+    // 기다리지 않는 **유일한 수단**이라 강체 0인 합 1에도 작동한다. 이 초식
+    // 자신의 폭발 · 읽기에도 들어가도록 피해 계산보다 먼저 둔다.
+    // 합당 1회로 막는다 — gapPrime과 같은 방어선 (drafts/017-pilot-3 D-5).
+    if (card.hardPrime && !game.hardPrimeUsedThisTurn) {
+      const before = game.hardBody;
+      game.hardBody = Math.min(game.hardBody + card.hardPrime, D.HARD_MAX);
+      const got = game.hardBody - before;
+      game.hardPrimeUsedThisTurn = true;
+      if (game.stats) game.stats.hardPrimed += got;
+      pushLog(game, `피를 태워 몸을 굳힙니다 — 강체 +${got} (지금 ${game.hardBody}).`);
+    }
+
     let effectiveDamage = card.damage + discardBonus;
     // 연환각성 (파일럿 1.5) — 연계 · 마무리의 수당만 올린다. 이은 수는 그대로.
     const perLinkBoost = sumEffectAmount(game, 'CHAIN_BOOST');
@@ -789,6 +845,51 @@ const TS_Engine = (() => {
         pushLog(game, `매도 — 간격 ${gapSold}칸을 팝니다 (지금 ${gaugeLabel(game.gauge)}).`);
       }
     }
+    // ── 강체 (권·부 계열, drafts/017-pilot-3) ────────────────────
+    // 이 카드가 보는 강체는 **낼 때의 값 하나**다. 읽기 · 폭발 · 방어도 ·
+    // 반탄 · 무기 · 매도가 전부 같은 hardAtPlay를 읽고, 줄이는 것(폭발 ·
+    // 매도)은 카드 처리 끝에 한 번만 적용한다. 간격에서 "찌르고 → 무기가
+    // 읽고 → 판다"로 순서를 고정했던 것과 같은 이유다 — 먼저 비우면 자기
+    // 보너스를 자기가 깎는다.
+    const hardAtPlay = game.hardBody;
+    const perHardBoost = sumEffectAmount(game, 'HARD_BOOST');
+    let hardBlockBonus = 0;
+    let hardBurstUsed = false;
+    let hardSold = 0;
+    if (card.hardScale) {
+      const bonus = (card.hardScale + perHardBoost) * hardAtPlay;
+      effectiveDamage += bonus;
+      if (bonus > 0) pushLog(game, `강체 ${hardAtPlay} — 추가 피해 ${bonus}.`);
+    }
+    if (card.hardBurst) {
+      const bonus = (card.hardBurst + perHardBoost) * hardAtPlay;
+      effectiveDamage += bonus;
+      hardBurstUsed = true;
+      if (game.stats) game.stats.hardBurstPlays += 1;
+      pushLog(game, bonus > 0
+        ? `폭발 — 강체 ${hardAtPlay}을(를) 터뜨려 추가 피해 ${bonus}.`
+        : '폭발 — 터뜨릴 강체가 없습니다.');
+    }
+    if (card.hardBlock) hardBlockBonus += card.hardBlock * hardAtPlay;
+    if (card.counterScale) {
+      const gain = card.counterScale * hardAtPlay;
+      if (gain > 0) {
+        game.counterDamage += gain;
+        pushLog(game, `강체를 반탄으로 — ${game.counterDamage}, 이번 적 페이즈의 매 피격마다 되돌립니다.`);
+      }
+    }
+    // 판다 (사파, 파일럿 3) — 강체를 비우고 1칸당 보상을 받는다.
+    // ✅ 간격에서는 비우면 **합이 끝나서** 이 동사가 성립하지 않았다. 강체는
+    // 기세 축이 아니라 별도 칸이라 비워도 합이 이어진다 (D-2).
+    if (card.hardSell) {
+      hardSold = Math.min(card.hardSell, hardAtPlay);
+      if (hardSold > 0) {
+        if (card.sellDamage) effectiveDamage += card.sellDamage * hardSold;
+        if (game.stats) game.stats.hardSold += hardSold;
+        pushLog(game, `매도 — 강체 ${hardSold}을(를) 팝니다.`);
+      }
+    }
+
     // 광기 (자 B라인) — 잃은 체력 10당 가산. 흡성(되메우기)과 정반대 방향이라
     // 두 라인이 같은 HP를 놓고 반대로 당긴다.
     if (card.rageScale) {
@@ -822,6 +923,25 @@ const TS_Engine = (() => {
       if (heavyBonus && card.cost >= heavyMin) {
         effectiveDamage += heavyBonus;
         pushLog(game, `창(槍) — 틈 ${card.cost}의 무거운 초식, 추가 피해 ${heavyBonus}.`);
+      }
+      // 권(拳) · 부(斧) (파일럿 3) — 같은 강체를 **흩느냐 모으느냐**로 갈린다.
+      // 창 · 곤이 깊이의 문턱으로 갈렸던 것과 달리 둘 다 강체 1당으로 읽고,
+      // 어느 틈의 초식에 실리느냐만 다르다. 계열에 가벼운 초식이 훨씬 많아
+      // 부의 수당이 권의 두 배다 (017-2 "같은 자원을 반대로 읽는다").
+      // 비우기 전의 강체(hardAtPlay)를 읽는다 — 매도 · 폭발보다 앞이다.
+      const light = weaponSum(game, 'fistLightBonus');
+      if (light && card.cost <= D.FIST_LIGHT_AT && hardAtPlay > 0) {
+        const bonus = light * hardAtPlay;
+        effectiveDamage += bonus;
+        if (game.stats) game.stats.fistFires += 1;
+        pushLog(game, `권(拳) — 가벼운 초식에 강체 ${hardAtPlay}을(를) 흩습니다. 추가 피해 ${bonus}.`);
+      }
+      const heavy = weaponSum(game, 'axeHeavyBonus');
+      if (heavy && card.cost >= D.AXE_HEAVY_AT && hardAtPlay > 0) {
+        const bonus = heavy * hardAtPlay;
+        effectiveDamage += bonus;
+        if (game.stats) game.stats.axeFires += 1;
+        pushLog(game, `부(斧) — 무거운 초식에 강체 ${hardAtPlay}을(를) 싣습니다. 추가 피해 ${bonus}.`);
       }
       // 암기(暗器) — 합이 길어질수록. 흑의 되감기가 "한 합"을 늘린다면
       // 이쪽은 "전투"를 늘린다 — 단위가 달라 겹치지 않는다.
@@ -874,7 +994,12 @@ const TS_Engine = (() => {
     const blockGain = (card.block || 0)
       + (card.chainBlock ? card.chainBlock * chainLinks(game) : 0)
       + gapBlockBonus
-      + (card.sellBlock ? card.sellBlock * gapSold : 0);
+      + hardBlockBonus
+      + (card.sellBlock ? card.sellBlock * (gapSold + hardSold) : 0);
+    // 강체를 줄이는 것은 여기서 한 번만 — 위의 보너스들이 모두 낼 때의 값을
+    // 읽은 뒤다. 폭발이 매도보다 세다(둘 다 들면 0이 된다).
+    if (hardBurstUsed) game.hardBody = 0;
+    else if (hardSold > 0) game.hardBody -= hardSold;
     // 바꾼다 (사파, 파일럿 1.5 D-1) — 드로우는 연계를 비우지 않는다.
     if (card.chainDraw) {
       const n = Math.min(card.chainDrawCap || 99, Math.floor(chainLinks(game) / card.chainDraw));
@@ -939,10 +1064,30 @@ const TS_Engine = (() => {
       game.gapKeepThisTurn += card.gapKeep;
       pushLog(game, `간격을 남겨 둡니다 — 다음 합으로 최대 ${game.gapKeepThisTurn}칸.`);
     }
-    // 매도로 산 체력
-    if (card.sellHeal && gapSold > 0) {
-      const healed = healPlayer(game, card.sellHeal * gapSold);
+    // 쌓는다 (정파, 파일럿 3) — 합이 끝날 때 강체를 이만큼까지 남긴다.
+    if (card.hardKeep) {
+      game.hardKeepThisTurn += card.hardKeep;
+      pushLog(game, `강체를 쌓아 둡니다 — 다음 합으로 최대 ${game.hardKeepThisTurn}.`);
+    }
+    // 자세 (파일럿 3 A-2) — 이번 적 페이즈에 맞을 때마다 강체를 더 쌓는다.
+    // 반탄과 같은 수명이고, 내 합에 틈을 내어 **다음 합에 받는 투자**다.
+    // 이것이 없으면 강체는 넘긴 깊이에서 자동으로 정해져 정할 것이 없다.
+    if (card.hardStance) {
+      game.hardStanceThisTurn += card.hardStance;
+      if (game.stats) game.stats.stancePlays += 1;
+      pushLog(game, `자세를 낮춥니다 — 이번 적 페이즈에 맞을 때마다 강체 +${D.HARD_PER_HIT + game.hardStanceThisTurn}.`);
+    }
+    // 매도로 산 체력 · 패 (간격 · 강체가 같은 보상 필드를 쓴다)
+    if (card.sellHeal && gapSold + hardSold > 0) {
+      const healed = healPlayer(game, card.sellHeal * (gapSold + hardSold));
       if (healed > 0) pushLog(game, `매도 — 체력 +${healed}.`);
+    }
+    // 017-3이 권·부의 사파를 "맞은 만큼 패를 뽑음"으로 적었다 — 보상의 중심.
+    if (card.sellDraw && gapSold + hardSold > 0) {
+      const n = card.sellDraw * (gapSold + hardSold);
+      drawCards(game, n);
+      game.cardDrawsThisTurn += n;
+      pushLog(game, `매도 — 카드 ${n}장.`);
     }
     // 점혈 (흑 B라인) — 적의 준비된 초식 중 가장 비싼 것을 봉인한다.
     // 클로저가 작아지므로 돌아오는 버퍼도 줄어든다 — 안전을 사는 대신
@@ -1016,6 +1161,10 @@ const TS_Engine = (() => {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'GAP_BOOST' });
       pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 찌르기 칸당 +${p.amount}.`);
+    } else if (card.effect === 'PERSISTENT_HARD_BOOST') {
+      const p = card.persistentPayload;
+      addOrRefreshEffect(game, { ...p, kind: 'HARD_BOOST' });
+      pushLog(game, `[${p.name}] 운용 — ${p.turns}합간 강체 읽기 · 폭발 수당 +${p.amount}.`);
     } else if (card.effect === 'PERSISTENT_HEAL_ON_TURN_START') {
       const p = card.persistentPayload;
       addOrRefreshEffect(game, { ...p, kind: 'HEAL_ON_TURN_START' });

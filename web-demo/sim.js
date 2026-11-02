@@ -80,6 +80,27 @@ window.TS_Sim = (() => {
     if (c.gapKeep) v += c.gapKeep * 3;
     // 산다: 지금 깊이를 곧바로 늘린다 — 되감기와 같은 자로 잰다.
     if (c.gapPrime) v += c.gapPrime * 3;
+    // 파일럿 3 (권·부) — 강체는 "직전 적 페이즈에 맞은 횟수"다. 합 안에서
+    // 변하지 않으므로 지금 값을 그대로 읽으면 된다(간격처럼 줄지 않는다).
+    const hard = g.hardBody || 0;
+    if (c.hardScale) v += c.hardScale * hard;
+    if (c.hardBurst) v += c.hardBurst * hard;
+    if (c.hardBlock) v += c.hardBlock * hard;
+    if (c.counterScale) v += c.counterScale * hard * 2.2; // 반탄과 같은 자
+    // 매도한 강체는 기세를 **쓰지 않는다** — 간격 매도와 결정적으로 다른
+    // 점이다(그래서 사파의 동사가 여기서는 선다). 분모에 넣지 않는다.
+    if (c.hardSell) {
+      const sold = Math.min(c.hardSell, hard);
+      v += sold * ((c.sellDamage || 0) + (c.sellBlock || 0) + (c.sellHeal || 0)
+        + (c.sellDraw || 0) * 4);
+    }
+    // 남긴다: 다음 합의 강체 1은 강체 초식 한 장이 한 번 더 받는 가산쯤이다.
+    if (c.hardKeep) v += c.hardKeep * 2.5;
+    // 산다: 지금 강체를 곧바로 늘린다 — 매수와 같은 자.
+    if (c.hardPrime) v += c.hardPrime * 3;
+    // 자세는 **다음 합에 받는 투자**다. 한 페이즈에 2~3대 맞으므로 자세 1은
+    // 강체 2~3에 해당하고, 그 강체가 다음 합에 두어 장에 실린다.
+    if (c.hardStance) v += c.hardStance * 6;
     v -= (c.hpCost || 0) * 0.8;
     // 산 칸은 반대로 비용을 **줄인다** — 틈을 안 쓰고 합을 늘린다.
     return v / Math.max(0.5, cost(g, c) + soldCost - (c.gapPrime || 0));
@@ -104,6 +125,9 @@ window.TS_Sim = (() => {
     // 마무리 · 봉인은 연계를 비운다 — 세 수 이상 모인 뒤에
     if ((c.finisher || c.chainSeal) && links(g) < 3) return true;
     if (c.evade && g.evadeCharges > 0) return true;
+    // 4) 강체를 비우는 초식(폭발 · 매도)은 읽는 초식 뒤에. 강체는 합 안에서
+    //    늘지 않으므로 "모일 때까지"가 아니라 **같은 합에 먼저 읽고 나서**다.
+    if ((c.hardBurst || c.hardSell) && (g.hardBody || 0) < 2) return true;
     return false;
   }
 
@@ -113,6 +137,14 @@ window.TS_Sim = (() => {
     let v = c.damage || 0;
     if (c.chain) v += c.chain * links(g);
     if (c.finisher) v += c.finisher * links(g);
+    // 강체도 카드에 "강체 1당 피해 N"으로 적혀 있고 화면에 숫자가 떠 있다 —
+    // 연계 · 마무리와 같은 층이라 초심자도 읽는다 (파일럿 3).
+    // ⚠️ deepStrike(찌르기)는 여기 **없다**. 넣는 게 맞지만 그 필드는 적(赤)의
+    //    일격이 쓰는 4문파 필드라, 넣으면 4문파 수치가 움직여 회귀가 깨진다.
+    //    그래서 창·곤의 초심자 수치는 이 누락만큼 낮게 잡혀 있다 — 파일럿 2의
+    //    5.3도 같은 조건이었으므로 비교 자체는 공정하다.
+    if (c.hardScale) v += c.hardScale * (g.hardBody || 0);
+    if (c.hardBurst) v += c.hardBurst * (g.hardBody || 0);
     if (c.discardAll) v += c.discardAll * (g.hand.length - 1);
     return v;
   }
@@ -198,7 +230,17 @@ window.TS_Sim = (() => {
       - hpLost * 2.2
       + (-sim.gauge) * 2.5        // 다음 합에 쓸 수 있는 기세
       + sim.playerBlock * 0.2
-      + sim.hand.length * 0.5;
+      + sim.hand.length * 0.5
+      // 파일럿 3 — 적 페이즈가 채운 강체. 이 줄이 없으면 탐색이 "깊게 넘겨
+      // 많이 맞는" 운영을 **구조가 아니라 평가 누락 때문에** 못 찾는다
+      // (drafts/017-pilot-3 A-3).
+      //
+      // ⚠️ **쓸 수 있는 덱일 때만** 센다. 강체는 맞으면 차므로 엔진이 모든
+      // 덱에서 센다 — 연계(초식을 내야 쌓임)나 간격(기세 축)과 달리 "안 쓰는
+      // 덱에서는 늘 0"이 성립하지 않는다. 조건 없이 더했더니 4문파 탐색이
+      // 못 쓰는 자원을 쫓아가 RED의 탐색 RNG 소모가 157만 → 151만으로
+      // 달라졌고, 뒤이어 돌린 BLUE가 8.3 → 8.2로 밀렸다.
+      + (base.usesHard ? (sim.hardBody || 0) * 3.0 : 0);
   }
 
   // 같은 key의 카드는 같은 수라 한 번만 가지를 친다
@@ -211,8 +253,13 @@ window.TS_Sim = (() => {
     return out;
   }
 
+  const HARD_FIELDS = ['hardScale', 'hardBurst', 'hardBlock', 'counterScale',
+    'hardSell', 'hardKeep', 'hardStance', 'hardPrime'];
+  const deckUsesHard = (g) => [...g.drawPile, ...g.hand, ...g.discardPile]
+    .some((c) => HARD_FIELDS.some((f) => c[f]));
+
   function searchTurn(g, nodeCap) {
-    const base = { bossHp: g.bossHp, playerHp: g.playerHp };
+    const base = { bossHp: g.bossHp, playerHp: g.playerHp, usesHard: deckUsesHard(g) };
     const startTurn = g.turn;
     let nodes = 0, bestScore = -Infinity, bestPath = null;
 
@@ -415,6 +462,8 @@ window.TS_Sim = (() => {
       damageTaken: 0, hpBurned: 0, maxHpDelta: 0, drainKills: 0, maxHitSum: 0, maxHitTop: 0, wins: 0, maxHits: [],
       boosterPicked: {}, offersNoFaction: 0,
       gapRewound: 0, gapSold: 0, spear: 0, staff: 0, deepPlays: 0, maxCards: 0,
+      hardAtStart: 0, hardTurns: 0, hardMax: 0, hardKept: 0, hardSold: 0,
+      hardPrimed: 0, hardBurstPlays: 0, stancePlays: 0, fist: 0, axe: 0,
       deck: { orthodox: 0, heterodox: 0, demonic: 0 }, deckLineage: 0, deckSize: 0 };
     const seenGames = new WeakSet();
     const recordBattle = (g) => {
@@ -434,6 +483,12 @@ window.TS_Sim = (() => {
       lin.gapRewound += s2.gapRewound || 0; lin.gapSold += s2.gapSold || 0;
       lin.spear += s2.spearFires || 0; lin.staff += s2.staffFires || 0;
       lin.deepPlays += s2.deepPlays || 0;
+      lin.hardAtStart += s2.hardAtStart || 0; lin.hardTurns += s2.hardTurns || 0;
+      lin.hardMax = Math.max(lin.hardMax, s2.hardMax || 0);
+      lin.hardKept += s2.hardKept || 0; lin.hardSold += s2.hardSold || 0;
+      lin.hardPrimed += s2.hardPrimed || 0; lin.hardBurstPlays += s2.hardBurstPlays || 0;
+      lin.stancePlays += s2.stancePlays || 0;
+      lin.fist += s2.fistFires || 0; lin.axe += s2.axeFires || 0;
       lin.maxCards = Math.max(lin.maxCards, s2.maxCardsInTurn || 0);
       lin.hpBurned += s2.hpBurned || 0;
       lin.maxHitSum += s2.maxHit || 0; lin.maxHits.push(s2.maxHit || 0); lin.maxHitTop = Math.max(lin.maxHitTop, s2.maxHit || 0);
@@ -573,6 +628,17 @@ window.TS_Sim = (() => {
           찌르기_합당: +(lin.deepPlays / T).toFixed(2),
           창_합당: +(lin.spear / T).toFixed(2),
           곤_합당: +(lin.staff / T).toFixed(2),
+          // 파일럿 3 (권·부). 강체_합당이 기준 9다 — 파훼하면 피격이 0이라
+          // 강체가 안 차므로, 실제로 차는지를 따로 봐야 한다.
+          강체_합당: +(lin.hardAtStart / Math.max(1, lin.hardTurns)).toFixed(2),
+          강체_최대: lin.hardMax,
+          남긴강체_합당: +(lin.hardKept / T).toFixed(2),
+          강체매도_합당: +(lin.hardSold / T).toFixed(2),
+          강체매수_합당: +(lin.hardPrimed / T).toFixed(2),
+          폭발_합당: +(lin.hardBurstPlays / T).toFixed(2),
+          자세_합당: +(lin.stancePlays / T).toFixed(2),
+          권_합당: +(lin.fist / T).toFixed(2),
+          부_합당: +(lin.axe / T).toFixed(2),
           한합최대초식: lin.maxCards,
           받은피해_합당: +(lin.damageTaken / T).toFixed(2),
           태운HP_런당: +(lin.hpBurned / runs).toFixed(1),
@@ -690,6 +756,24 @@ window.TS_Sim = (() => {
       }
     });
 
+    // 2-d) 자세(hardStance)를 올리는 강화는 금지 (drafts/017-pilot-3 F-2) —
+    //       자세는 피격 횟수에 곱해지고 그 결과가 다시 폭발 수당에 곱해진다.
+    Object.entries(D2.UPGRADES || {}).forEach(([key, patch]) => {
+      if (patch && patch.hardStance != null) {
+        problems.push(`강화 ${key}: hardStance를 올린다 — 피격 횟수와 폭발 수당에 두 번 곱해진다 (파일럿 3 F-2)`);
+      }
+    });
+    // 2-e) 한 장이 강체를 읽고(hardScale) 또 비우면(hardBurst) 두 번 먹는다.
+    all.forEach(({ col, c, where }) => {
+      if (c.hardScale && c.hardBurst) {
+        problems.push(`${col} ${where} · ${c.name}: hardScale과 hardBurst를 함께 듦 — 같은 강체를 두 번 먹는다`);
+      }
+      // hardPrime도 합당 1회로 막혀 있지만, 한 장이 뚜껑까지 채우면 그 1회로 끝난다
+      if (c.hardPrime && c.hardPrime > 5) {
+        problems.push(`${col} ${where} · ${c.name}: hardPrime ${c.hardPrime} — 한 번에 사는 양이 과함(뚜껑 ${D2.HARD_MAX})`);
+      }
+    });
+
     // 3) score()가 0점으로 보는 필드가 있는가 — 빠진 필드는 "버려도 되는
     //    카드"라는 뜻이 되어 교환·보상 통계를 통째로 뒤튼다
     const KNOWN = new Set(['key','name','cost','count','desc','upgraded','unique','exhaust',
@@ -701,7 +785,10 @@ window.TS_Sim = (() => {
       // 파일럿 1.5
       'basic','finisher','chainSeal','sealAll','chainDraw','chainDrawCap','bossExpose',
       // 파일럿 2 (창·곤)
-      'gapKeep','gapSell','gapPrime','sellDamage','sellBlock','sellHeal']);
+      'gapKeep','gapSell','gapPrime','sellDamage','sellBlock','sellHeal',
+      // 파일럿 3 (권·부)
+      'hardStance','hardScale','hardBurst','hardBlock','counterScale',
+      'hardKeep','hardSell','hardPrime','sellDraw']);
     const unseen = new Set();
     all.forEach(({ c }) => Object.keys(c).forEach((k) => { if (!KNOWN.has(k)) unseen.add(k); }));
     unseen.forEach((k) => problems.push(`점수 함수가 모르는 필드: ${k} — sim.js score()에 넣으세요`));
